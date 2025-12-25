@@ -1,0 +1,38 @@
+{# 
+  Reusable checkbox component
+  
+  Parameters:
+  - field: checkbox field name/id (required)
+  - label: label text (required)
+  - checked: whether checkbox is checked (default: false)
+  - disabled: whether field is disabled
+  - help: help text to show below checkbox
+  - value: value to submit when checked (default: 'on')
+  - classes: additional CSS classes
+#}
+
+<div class="form-group">
+  <div class="flex items-start">
+    <div class="flex items-center h-5">
+      <input 
+        type="checkbox"
+        class="form-checkbox {{ classes }}"
+        id="{{ field }}" 
+        name="{{ field }}"
+        value="{{ value|default('on') }}"
+        {% if checked %}checked{% endif %}
+        {% if disabled %}disabled{% endif %}
+      >
+    </div>
+    <div class="ml-3">
+      <label class="form-label !mb-0 cursor-pointer" for="{{ field }}">
+        {{ label }}
+      </label>
+      {% if help %}
+        <p class="form-help !mt-1">
+          {{ help }}
+        </p>
+      {% endif %}
+    </div>
+  </div>
+</div>

@@ -1,0 +1,349 @@
+{% extends "layout_main.jinja" %}
+
+{% block content %}
+<div class="container-page max-w-5xl">
+    <!-- Breadcrumb -->
+    <nav class="text-sm mb-6" aria-label="Breadcrumb">
+        <ol class="flex items-center space-x-2">
+            <li><a href="/" class="text-primary-400 hover:text-primary-300 transition-colors">Home</a></li>
+            <li class="text-text-tertiary">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                </svg>
+            </li>
+            <li><a href="/zfs/replication" class="text-primary-400 hover:text-primary-300 transition-colors">Replication</a></li>
+            <li class="text-text-tertiary">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                </svg>
+            </li>
+            <li class="text-text-primary font-medium">Create Job</li>
+        </ol>
+    </nav>
+
+    <!-- Page Header -->
+    <div class="mb-8">
+        <h1 class="text-3xl font-bold text-text-primary mb-2">Create Replication Job</h1>
+        <p class="text-text-secondary">Schedule automated replication of ZFS datasets</p>
+    </div>
+
+    <!-- Messages -->
+    {% if error %}
+        <div id="error-message" class="bg-danger-900/30 border border-danger-700 text-danger-400 px-4 py-3 rounded-lg mb-6 flex items-center">
+            <svg class="w-5 h-5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+            <span><strong>Error:</strong> {{ error }}</span>
+        </div>
+    {% endif %}
+
+    <!-- Job Creation Form -->
+    <div class="card mb-6">
+        <div class="card-body">
+            <form method="post" action="/zfs/replication/jobs/create" id="job-form">
+                <!-- Job Name -->
+                <div class="mb-6">
+                    <label class="form-label" for="name">
+                        Job Name <span class="text-danger-400">*</span>
+                    </label>
+                    <input type="text" name="name" id="name" required class="form-input" placeholder="Daily backup to remote">
+                </div>
+
+                <!-- Source and Type -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                    <div>
+                        <label class="form-label" for="source_dataset">
+                            Source Dataset <span class="text-danger-400">*</span>
+                        </label>
+                        <select name="source_dataset" id="source_dataset" required class="form-select">
+                            <option value="">-- Select source dataset --</option>
+                            {% for dataset in datasets %}
+                            <option value="{{ dataset.name }}">{{ dataset.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="form-label" for="replication_type">
+                            Replication Type <span class="text-danger-400">*</span>
+                        </label>
+                        <select name="replication_type" id="replication_type" required class="form-select">
+                            <option value="local">Local (same system)</option>
+                            <option value="push">Push (local → remote)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Remote Options (shown when push is selected) -->
+                <div id="remote-options" class="hidden mb-6">
+                    <div class="card-nested">
+                        <h3 class="font-semibold text-lg mb-4 text-text-primary flex items-center">
+                            <svg class="w-5 h-5 mr-2 text-info-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"/>
+                            </svg>
+                            Remote Connection
+                        </h3>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                            <div>
+                                <label class="form-label" for="remote_host">
+                                    Remote Host <span class="text-danger-400">*</span>
+                                </label>
+                                <input type="text" name="remote_host" id="remote_host" class="form-input" placeholder="user@hostname">
+                            </div>
+
+                            <div>
+                                <label class="form-label" for="remote_port">
+                                    SSH Port
+                                </label>
+                                <input type="number" name="remote_port" id="remote_port" value="22" class="form-input">
+                            </div>
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label class="form-label" for="remote_password">
+                                SSH Password (optional - for testing)
+                            </label>
+                            <input type="password" name="remote_password" id="remote_password" class="form-input" placeholder="Leave empty if using SSH keys">
+                            <p class="text-text-tertiary text-xs mt-1">For scheduled jobs, SSH keys are strongly recommended</p>
+                        </div>
+                        
+                        <div class="flex items-center gap-4">
+                            <button type="button" id="test-connection-btn" class="btn-success">
+                                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                                </svg>
+                                Test Connection & Load Datasets
+                            </button>
+                            <span id="connection-status"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Target Dataset -->
+                <div class="mb-6">
+                    <label class="form-label" for="target_dataset">
+                        Target Dataset <span class="text-danger-400">*</span>
+                    </label>
+                    <select name="target_dataset" id="target_dataset" required class="form-select">
+                        <option value="">-- Select target dataset --</option>
+                    </select>
+                    <p class="text-text-tertiary text-xs mt-1">Select the target dataset for replication</p>
+                </div>
+
+                <!-- Compression and Schedule -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                    <div>
+                        <label class="form-label" for="compression">
+                            Compression
+                        </label>
+                        <select name="compression" id="compression" class="form-select">
+                            {% for method in compression_methods %}
+                            <option value="{{ method }}" {% if method == 'lz4' %}selected{% endif %}>{{ method }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="form-label" for="schedule">
+                            Schedule (cron format) <span class="text-danger-400">*</span>
+                        </label>
+                        <input type="text" name="schedule" id="schedule" required class="form-input" placeholder="0 2 * * *">
+                        <p class="text-text-tertiary text-xs mt-1">Cron format: minute hour day month weekday</p>
+                    </div>
+                </div>
+
+                <!-- Options -->
+                <div class="space-y-3 mb-6">
+                    <label class="flex items-center">
+                        <input type="checkbox" name="recursive" value="true" class="form-checkbox">
+                        <span class="ml-3 text-text-secondary">Recursive (include child datasets)</span>
+                    </label>
+                    <label class="flex items-center">
+                        <input type="checkbox" name="enabled" value="true" checked class="form-checkbox">
+                        <span class="ml-3 text-text-secondary">Enabled (job will run on schedule)</span>
+                    </label>
+                </div>
+
+                <!-- Actions -->
+                <div class="flex items-center justify-between pt-4 border-t border-border-subtle">
+                    <button type="submit" class="btn-success">
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+                        </svg>
+                        Create Job
+                    </button>
+                    <a href="/zfs/replication" class="btn-secondary">
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                        Cancel
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Cron Schedule Examples -->
+    <div class="card-nested bg-info-900/20 border-info-700 mb-6">
+        <h3 class="font-semibold mb-3 text-text-primary flex items-center">
+            <svg class="w-5 h-5 mr-2 text-info-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+            Cron Schedule Examples
+        </h3>
+        <ul class="space-y-2 text-sm text-text-secondary">
+            <li class="flex items-center">
+                <code class="bg-info-900/30 text-info-400 px-2 py-1 rounded mr-2 font-mono text-xs">0 2 * * *</code>
+                <span>Daily at 2:00 AM</span>
+            </li>
+            <li class="flex items-center">
+                <code class="bg-info-900/30 text-info-400 px-2 py-1 rounded mr-2 font-mono text-xs">0 */6 * * *</code>
+                <span>Every 6 hours</span>
+            </li>
+            <li class="flex items-center">
+                <code class="bg-info-900/30 text-info-400 px-2 py-1 rounded mr-2 font-mono text-xs">0 0 * * 0</code>
+                <span>Weekly on Sunday at midnight</span>
+            </li>
+            <li class="flex items-center">
+                <code class="bg-info-900/30 text-info-400 px-2 py-1 rounded mr-2 font-mono text-xs">0 0 1 * *</code>
+                <span>Monthly on the 1st at midnight</span>
+            </li>
+        </ul>
+    </div>
+
+    <!-- SSH Authentication Guide -->
+    <div class="card-nested bg-warning-900/20 border-warning-700">
+        <h3 class="font-semibold mb-3 text-text-primary flex items-center">
+            <svg class="w-5 h-5 mr-2 text-warning-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/>
+            </svg>
+            SSH Authentication for Scheduled Jobs
+        </h3>
+        <div class="space-y-3 text-sm text-text-secondary">
+            <p><strong class="text-text-primary">Recommended:</strong> Use SSH key-based authentication for scheduled replication jobs.</p>
+            <p>Password authentication is available for testing but not recommended for production scheduled jobs as passwords cannot be securely stored for automated execution.</p>
+            <div>
+                <p class="font-medium text-text-primary mb-2">Setup SSH keys:</p>
+                <div class="bg-bg-elevated-3 p-3 rounded border border-border-default font-mono text-xs text-success-400 overflow-x-auto">
+<pre>ssh-keygen -t ed25519 -f /root/.ssh/id_zfs_replication
+ssh-copy-id -i /root/.ssh/id_zfs_replication.pub user@remotehost</pre>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+    const allDatasets = {{ datasets | tojson }};
+    const sourceDatasetSelect = document.getElementById('source_dataset');
+    const replicationTypeSelect = document.getElementById('replication_type');
+    const remoteOptions = document.getElementById('remote-options');
+    const targetDatasetSelect = document.getElementById('target_dataset');
+    const testConnectionBtn = document.getElementById('test-connection-btn');
+    const connectionStatus = document.getElementById('connection-status');
+
+// Handle replication type change
+replicationTypeSelect.addEventListener('change', function() {
+    if (this.value === 'push') {
+        remoteOptions.classList.remove('hidden');
+        targetDatasetSelect.innerHTML = '<option value="">-- Test connection first --</option>';
+    } else {
+        remoteOptions.classList.add('hidden');
+        loadLocalDatasets();
+    }
+});
+
+// Handle source dataset change (for local replication)
+sourceDatasetSelect.addEventListener('change', function() {
+    if (replicationTypeSelect.value === 'local') {
+        loadLocalDatasets();
+    }
+});
+
+// Load local datasets (excluding source dataset)
+function loadLocalDatasets() {
+    const sourceDataset = sourceDatasetSelect.value;
+    if (!sourceDataset) {
+        targetDatasetSelect.innerHTML = '<option value="">-- Select source dataset first --</option>';
+        return;
+    }
+    
+    // Clear and populate target dropdown
+    targetDatasetSelect.innerHTML = '<option value="">-- Select target dataset --</option>';
+    allDatasets.forEach(dataset => {
+        if (dataset.name !== sourceDataset) {
+            const option = document.createElement('option');
+            option.value = dataset.name;
+            option.textContent = dataset.name;
+            targetDatasetSelect.appendChild(option);
+        }
+    });
+}
+
+// Test remote connection and load datasets
+testConnectionBtn.addEventListener('click', async function() {
+    const remoteHost = document.getElementById('remote_host').value;
+    const remotePort = document.getElementById('remote_port').value;
+    const remotePassword = document.getElementById('remote_password').value;
+    
+    if (!remoteHost) {
+        connectionStatus.innerHTML = '<span class="text-danger-400 flex items-center"><svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg> Please enter remote host</span>';
+        return;
+    }
+    
+    connectionStatus.innerHTML = '<span class="text-info-400 flex items-center"><svg class="w-4 h-4 mr-1 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg> Testing connection...</span>';
+    testConnectionBtn.disabled = true;
+    
+    try {
+        const requestBody = {
+            remote_host: remoteHost,
+            remote_port: parseInt(remotePort)
+        };
+        
+        // Only include password if provided
+        if (remotePassword) {
+            requestBody.remote_password = remotePassword;
+        }
+        
+        const response = await fetch('/zfs/replication/api/test-remote-connection', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(requestBody)
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            connectionStatus.innerHTML = '<span class="text-success-400 flex items-center"><svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg> Connected successfully!</span>';
+            
+            // Populate target dropdown with remote datasets
+            targetDatasetSelect.innerHTML = '<option value="">-- Select target dataset --</option>';
+            data.datasets.forEach(dataset => {
+                const option = document.createElement('option');
+                option.value = dataset;
+                option.textContent = dataset;
+                targetDatasetSelect.appendChild(option);
+            });
+        } else {
+            connectionStatus.innerHTML = `<span class="text-danger-400 flex items-center"><svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg> ${data.error}</span>`;
+            targetDatasetSelect.innerHTML = '<option value="">-- Connection failed --</option>';
+        }
+    } catch (error) {
+        connectionStatus.innerHTML = '<span class="text-danger-400 flex items-center"><svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg> Connection failed</span>';
+        targetDatasetSelect.innerHTML = '<option value="">-- Connection failed --</option>';
+    } finally {
+        testConnectionBtn.disabled = false;
+    }
+});
+
+// Initialize on page load
+if (replicationTypeSelect.value === 'local') {
+    loadLocalDatasets();
+}
+})();
+</script>
+{% endblock %}

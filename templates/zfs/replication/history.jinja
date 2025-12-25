@@ -1,0 +1,214 @@
+{% extends "layout_main.jinja" %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block content %}
+<div class="container-custom">
+    <div class="flex items-center justify-between mb-6">
+        <div class="flex items-center space-x-3">
+            <a href="/zfs/replication" class="text-text-secondary hover:text-text-primary">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                </svg>
+            </a>
+            <h1 class="heading-1">Replication Execution History</h1>
+        </div>
+        <a href="/zfs/replication/notifications/settings" class="btn-secondary">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
+            </svg>
+            <span>Notification Settings</span>
+        </a>
+    </div>
+
+    {% if error %}
+    <div class="alert-error">
+        {{ error }}
+    </div>
+    {% endif %}
+
+    {% if request.args.get('message') %}
+    <div class="alert-success">
+        {{ request.args.get('message') }}
+    </div>
+    {% endif %}
+
+    <!-- Active Executions -->
+    {% if active_executions %}
+    <div class="card mb-6">
+        <div class="card-header">
+            <h2 class="heading-2">Active Transfers</h2>
+            <span class="badge-warning">{{ active_executions|length }} running</span>
+        </div>
+        <div class="card-content">
+            <div class="table-container">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Job Name</th>
+                            <th>Source → Target</th>
+                            <th>Type</th>
+                            <th>Started</th>
+                            <th>Duration</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for execution in active_executions %}
+                        <tr>
+                            <td class="font-mono text-sm">#{{ execution.id }}</td>
+                            <td class="font-medium">{{ execution.job_name }}</td>
+                            <td class="font-mono text-sm">
+                                <span class="text-primary-400">{{ execution.source_dataset }}</span>
+                                <span class="text-text-tertiary mx-1">→</span>
+                                <span class="text-success-400">{{ execution.target_dataset }}</span>
+                            </td>
+                            <td>
+                                <span class="badge-info">{{ execution.replication_type }}</span>
+                            </td>
+                            <td class="text-sm text-text-secondary">
+                                {{ execution.started_at }}
+                            </td>
+                            <td class="text-sm">
+                                <span class="text-warning-400 animate-pulse">Running...</span>
+                            </td>
+                            <td>
+                                <a href="/zfs/replication/history/{{ execution.id }}" 
+                                   class="btn-sm btn-primary">
+                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                                    </svg>
+                                    <span>Monitor</span>
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Execution History -->
+    <div class="card">
+        <div class="card-header">
+            <h2 class="heading-2">Execution History</h2>
+            <span class="text-text-tertiary text-sm">Last {{ history|length }} executions</span>
+        </div>
+        <div class="card-content">
+            {% if history %}
+            <div class="table-container">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Job Name</th>
+                            <th>Source → Target</th>
+                            <th>Type</th>
+                            <th>Status</th>
+                            <th>Started</th>
+                            <th>Duration</th>
+                            <th>Transferred</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for execution in history %}
+                        <tr>
+                            <td class="font-mono text-sm">#{{ execution.id }}</td>
+                            <td class="font-medium">
+                                {% if execution.job_id %}
+                                    <a href="/zfs/replication/jobs/{{ execution.job_id }}/detail" 
+                                       class="text-primary-400 hover:text-primary-300">
+                                        {{ execution.job_name }}
+                                    </a>
+                                {% else %}
+                                    {{ execution.job_name }}
+                                {% endif %}
+                            </td>
+                            <td class="font-mono text-sm">
+                                <span class="text-primary-400">{{ execution.source_dataset }}</span>
+                                <span class="text-text-tertiary mx-1">→</span>
+                                <span class="text-success-400">{{ execution.target_dataset }}</span>
+                            </td>
+                            <td>
+                                <span class="badge-info">{{ execution.replication_type }}</span>
+                            </td>
+                            <td>
+                                {% if execution.status == 'success' %}
+                                    <span class="badge-success">Success</span>
+                                {% elif execution.status == 'failure' %}
+                                    <span class="badge-error">Failed</span>
+                                {% else %}
+                                    <span class="badge-warning">{{ execution.status|capitalize }}</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-sm text-text-secondary">
+                                {{ execution.started_at|truncate(19, True, '') }}
+                            </td>
+                            <td class="text-sm">
+                                {% if execution.duration_seconds %}
+                                    {{ "%.2f"|format(execution.duration_seconds) }}s
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                            <td class="text-sm">
+                                {% if execution.bytes_transferred > 0 %}
+                                    {{ (execution.bytes_transferred / 1024 / 1024)|round(2) }} MB
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                            <td>
+                                <a href="/zfs/replication/history/{{ execution.id }}" 
+                                   class="btn-sm btn-secondary">
+                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                                    </svg>
+                                    <span>Details</span>
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Pagination -->
+            <div class="mt-4 flex items-center justify-between border-t border-border pt-4">
+                <div class="text-sm text-text-secondary">
+                    Showing {{ offset + 1 }} to {{ offset + history|length }} of many
+                </div>
+                <div class="flex space-x-2">
+                    {% if offset > 0 %}
+                    <a href="/zfs/replication/history?limit={{ limit }}&offset={{ offset - limit }}" 
+                       class="btn-sm btn-secondary">
+                        ← Previous
+                    </a>
+                    {% endif %}
+                    {% if history|length == limit %}
+                    <a href="/zfs/replication/history?limit={{ limit }}&offset={{ offset + limit }}" 
+                       class="btn-sm btn-secondary">
+                        Next →
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+            {% else %}
+            <div class="text-center py-8 text-text-secondary">
+                <svg class="w-16 h-16 mx-auto mb-4 text-text-tertiary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+                <p class="text-lg font-medium">No replication history yet</p>
+                <p class="mt-1">Execute a replication to see history here</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

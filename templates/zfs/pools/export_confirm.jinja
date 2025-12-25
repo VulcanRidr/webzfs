@@ -1,0 +1,183 @@
+{% extends "layout.jinja" %}
+
+{% block content %}
+<div class="space-y-6 max-w-3xl mx-auto">
+    <!-- Breadcrumb -->
+    <nav class="flex items-center text-sm text-text-secondary">
+        <a href="/zfs/pools" class="hover:text-text-primary transition-colors">Pools</a>
+        <svg class="w-4 h-4 mx-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+        </svg>
+        <a href="/zfs/pools/{{ pool_name }}" class="hover:text-text-primary transition-colors">{{ pool_name }}</a>
+        <svg class="w-4 h-4 mx-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+        </svg>
+        <span class="text-text-primary font-medium">Export</span>
+    </nav>
+
+    <!-- Page Header -->
+    <div>
+        <h1 class="text-3xl font-bold text-text-primary">Export Pool</h1>
+        <p class="text-text-secondary mt-1">Safely export pool for maintenance or migration</p>
+    </div>
+
+    <!-- Warning -->
+    <div class="bg-warning-900/20 border-2 border-warning-500 rounded-xl p-6">
+        <div class="flex items-start gap-4">
+            <div class="flex-shrink-0">
+                <svg class="h-8 w-8 text-warning-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                </svg>
+            </div>
+            <div class="flex-1">
+                <h3 class="text-lg font-semibold text-warning-400 mb-2">Warning: Critical Operation</h3>
+                <p class="text-text-secondary mb-3">You are about to export pool <strong class="font-mono text-text-primary">{{ pool_name }}</strong>.</p>
+                <ul class="text-sm text-text-secondary space-y-2">
+                    <li class="flex items-start gap-2">
+                        <svg class="w-4 h-4 text-warning-400 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                        </svg>
+                        <span>All datasets in this pool will be unmounted</span>
+                    </li>
+                    <li class="flex items-start gap-2">
+                        <svg class="w-4 h-4 text-warning-400 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                        </svg>
+                        <span>The pool will no longer be accessible until re-imported</span>
+                    </li>
+                    <li class="flex items-start gap-2">
+                        <svg class="w-4 h-4 text-warning-400 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                        </svg>
+                        <span>Any active processes using the pool's datasets will be disrupted</span>
+                    </li>
+                    <li class="flex items-start gap-2">
+                        <svg class="w-4 h-4 text-success-400 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                        </svg>
+                        <span>Data will remain safe on disk and can be re-imported later</span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- Confirmation Form -->
+    <div class="card">
+        <div class="card-body">
+            <h2 class="text-xl font-semibold text-text-primary mb-4">Confirm Export</h2>
+            
+            <form method="post" action="/zfs/pools/{{ pool_name }}/export" class="space-y-4" id="form-export-pool">
+                <!-- Force Option -->
+                <div class="card-nested">
+                    <div class="flex items-start gap-3">
+                        <input type="checkbox" 
+                               id="force" 
+                               name="force" 
+                               value="true"
+                               class="form-checkbox mt-1">
+                        <label for="force" class="flex-1">
+                            <span class="font-medium text-text-primary block mb-1">Force export</span>
+                            <p class="text-sm text-text-secondary">
+                                Force unmount all datasets even if they are busy. Use this if the pool is in use but you need to export it anyway.
+                            </p>
+                            <p class="text-sm text-danger-400 mt-2 flex items-center gap-2">
+                                <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                                </svg>
+                                <strong>Warning:</strong> This may cause data loss if processes are actively writing to the pool.
+                            </p>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Buttons -->
+                <div class="flex justify-end gap-3 pt-4">
+                    <a href="/zfs/pools/{{ pool_name }}" class="btn-secondary">
+                        Cancel
+                    </a>
+                    <button type="button" 
+                            class="btn-danger"
+                            onclick="showConfirm('confirm-export-pool')">
+                        Export Pool
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Information -->
+    <div class="card-nested">
+        <h3 class="text-sm font-semibold text-text-primary mb-3 flex items-center gap-2">
+            <svg class="w-4 h-4 text-info-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            What happens when you export a pool?
+        </h3>
+        <ol class="text-sm text-text-secondary space-y-2">
+            <li class="flex items-start gap-2">
+                <span class="text-text-tertiary font-medium">1.</span>
+                <span>All datasets in the pool are unmounted</span>
+            </li>
+            <li class="flex items-start gap-2">
+                <span class="text-text-tertiary font-medium">2.</span>
+                <span>The pool is removed from the active pools list</span>
+            </li>
+            <li class="flex items-start gap-2">
+                <span class="text-text-tertiary font-medium">3.</span>
+                <span>The pool's configuration is written to disk</span>
+            </li>
+            <li class="flex items-start gap-2">
+                <span class="text-text-tertiary font-medium">4.</span>
+                <span>The pool can be re-imported on this or another system</span>
+            </li>
+            <li class="flex items-start gap-2">
+                <span class="text-text-tertiary font-medium">5.</span>
+                <span>No data is deleted - everything remains on the physical disks</span>
+            </li>
+        </ol>
+    </div>
+</div>
+
+<!-- Confirmation Modal -->
+{% set id = 'confirm-export-pool' %}
+{% set title = 'Export ZFS Pool' %}
+{% set message = 'Are you sure you want to export ' ~ pool_name ~ '? All datasets will be unmounted and the pool will no longer be accessible until re-imported.' %}
+{% set confirm_text = 'Export Pool' %}
+{% set confirm_class = 'danger' %}
+{% set confirm_action = 'document.getElementById("form-export-pool").submit()' %}
+{% include 'partials/confirm.jinja' %}
+
+<script>
+// Ensure showConfirm function is available
+window.showConfirm = function(dialogId) {
+    const dialog = document.getElementById(dialogId);
+    
+    if (!dialog) {
+        console.error('Dialog not found:', dialogId);
+        return;
+    }
+    
+    // Try using Alpine's global Alpine object if available
+    if (window.Alpine) {
+        // Use Alpine.$data to access the component's data
+        const component = window.Alpine.$data(dialog);
+        if (component) {
+            component.open = true;
+            return;
+        }
+    }
+    
+    // Fallback to __x property
+    if (dialog.__x) {
+        dialog.__x.$data.open = true;
+        return;
+    }
+    
+    // If neither works, try dispatching an event
+    dialog.dispatchEvent(new CustomEvent('open-modal'));
+    console.warn('Could not open modal using Alpine.js, tried dispatching event');
+};
+</script>
+
+{% endblock %}

@@ -1,0 +1,198 @@
+{% extends "layout.jinja" %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <!-- Breadcrumb Navigation -->
+    <nav class="text-sm mb-6 text-text-tertiary">
+        <a href="/utils/smart" class="hover:text-blue-400">SMART Monitoring</a> 
+        <span class="mx-2">/</span> 
+        <span class="text-text-primary">Smartd Configuration</span>
+    </nav>
+
+    <!-- Page Header -->
+    <div class="flex justify-between items-center mb-6">
+        <h1 class="text-3xl font-bold text-text-primary">Smartd Daemon Configuration</h1>
+        <a href="/utils/smart" class="btn-secondary hover:bg-bg-elevated-2 text-text-primary px-4 py-2 rounded inline-block">
+            ← Back to Disks
+        </a>
+    </div>
+
+    <!-- Success/Error Messages -->
+    {% if request.query_params.get('message') %}
+    <div class="bg-success-900/30 border-2 border-success-500/50 text-success-400 px-4 py-3 rounded mb-4">
+        {{ request.query_params.get('message') }}
+    </div>
+    {% endif %}
+    
+    {% if request.query_params.get('error') %}
+    <div class="bg-danger-900/30 border-2 border-danger-500/50 text-danger-400 px-4 py-3 rounded mb-4">
+        <strong>Error:</strong> {{ request.query_params.get('error') }}
+    </div>
+    {% endif %}
+
+    {% if error %}
+    <div class="bg-danger-900/30 border-2 border-danger-500/50 text-danger-400 px-4 py-3 rounded mb-4">
+        <strong>Error:</strong> {{ error }}
+    </div>
+    {% endif %}
+
+    <!-- Smartd Status -->
+    <div class="bg-bg-elevated rounded-lg p-6 mb-6">
+        <h2 class="text-xl font-bold text-text-primary mb-4">Daemon Status</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <div class="text-text-tertiary text-sm mb-1">Service Status</div>
+                <div class="text-text-primary">
+                    {% if status.running %}
+                    <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-green-900 text-green-300">
+                        <span class="w-2 h-2 bg-green-400 rounded-full mr-2"></span>
+                        Running
+                    </span>
+                    {% else %}
+                    <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-red-900 text-red-300">
+                        <span class="w-2 h-2 bg-red-400 rounded-full mr-2"></span>
+                        Stopped
+                    </span>
+                    {% endif %}
+                </div>
+            </div>
+            <div>
+                <form method="post" action="/utils/smart/smartd/restart" id="form-restart-daemon">
+                    <button type="button" 
+                            class="bg-blue-600 hover:bg-blue-700 text-text-primary px-6 py-2 rounded"
+                            onclick="showConfirm('modal-restart-daemon')">
+                        🔄 Restart Daemon
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        {% if status.status_output %}
+        <div class="mt-4">
+            <details class="bg-bg-elevated-2 rounded p-4">
+                <summary class="cursor-pointer text-text-secondary font-semibold">View Full Status Output</summary>
+                <pre class="mt-4 text-xs text-text-secondary overflow-x-auto">{{ status.status_output }}</pre>
+            </details>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Configuration Editor -->
+    <div class="bg-bg-elevated rounded-lg overflow-hidden shadow-lg">
+        <div class="p-6 border-b border-gray-700">
+            <h2 class="text-xl font-bold text-text-primary">Configuration File (/etc/smartd.conf)</h2>
+        </div>
+        
+        <form method="post" action="/utils/smart/smartd/config" id="form-save-config">
+            <div class="p-6">
+                <textarea 
+                    name="config" 
+                    rows="20" 
+                    class="w-full bg-gray-900 text-text-secondary font-mono text-sm p-4 rounded border border-gray-600 focus:border-blue-500 focus:outline-none"
+                    placeholder="# smartd.conf configuration&#10;# Add your configuration here...">{{ config }}</textarea>
+            </div>
+            
+            <div class="px-6 py-4 bg-bg-elevated-2 flex justify-between items-center">
+                <div class="text-text-tertiary text-sm">
+                    <svg class="w-5 h-5 inline text-warning-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                    </svg> Remember to restart the daemon after saving changes
+                </div>
+                <button type="button" 
+                        class="bg-green-600 hover:bg-green-700 text-text-primary px-6 py-2 rounded font-semibold"
+                        onclick="showConfirm('modal-save-config')">
+                    <svg class="w-5 h-5 inline text-info-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/>
+                    </svg> Save Configuration
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Configuration Help -->
+    <div class="mt-6 bg-info-900/30 border-2 border-info-500/50 text-info-400 px-4 py-3 rounded">
+        <strong><svg class="w-5 h-5 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg> Configuration Tips:</strong>
+        <ul class="mt-2 text-sm list-disc list-inside space-y-1">
+            <li><strong>DEVICESCAN</strong> - Automatically monitor all SMART-capable devices</li>
+            <li><strong>-a</strong> - Monitor all SMART attributes</li>
+            <li><strong>-o on</strong> - Enable automatic offline testing</li>
+            <li><strong>-S on</strong> - Enable automatic attribute autosave</li>
+            <li><strong>-s (S/../.././02|L/../../6/03)</strong> - Schedule short tests daily at 2am, long tests weekly on Saturday at 3am</li>
+            <li><strong>-m user@example.com</strong> - Send email alerts to specified address</li>
+            <li><strong>-M test</strong> - Send test email on startup</li>
+        </ul>
+        <div class="mt-3 bg-blue-950 p-3 rounded font-mono text-xs">
+            <div class="text-blue-300 font-semibold mb-2">Example Configuration:</div>
+            <pre class="text-blue-100"># Monitor all devices
+DEVICESCAN -a -o on -S on -s (S/../.././02|L/../../6/03) -m root -M exec /usr/libexec/smartd/smartd-runner</pre>
+        </div>
+    </div>
+
+    <!-- Warning -->
+    <div class="mt-4 bg-yellow-900 border border-yellow-700 text-yellow-200 px-4 py-3 rounded">
+        <strong><svg class="w-5 h-5 inline text-warning-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                    </svg> Warning:</strong>
+        <p class="mt-1 text-sm">
+            Modifying smartd.conf requires appropriate system permissions. Test your configuration carefully before 
+            deploying to production systems. Syntax errors may prevent the smartd daemon from starting.
+        </p>
+    </div>
+</div>
+
+<!-- Confirmation Modals -->
+{% set id = 'modal-restart-daemon' %}
+{% set title = 'Restart Daemon' %}
+{% set message = 'Restart smartd daemon?' %}
+{% set confirm_text = 'Restart' %}
+{% set confirm_class = 'primary' %}
+{% set confirm_action = 'document.getElementById("form-restart-daemon").submit()' %}
+{% include 'partials/confirm.jinja' %}
+
+{% set id = 'modal-save-config' %}
+{% set title = 'Save Configuration' %}
+{% set message = 'Save configuration changes?' %}
+{% set confirm_text = 'Save' %}
+{% set confirm_class = 'primary' %}
+{% set confirm_action = 'document.getElementById("form-save-config").submit()' %}
+{% include 'partials/confirm.jinja' %}
+
+<script>
+// Wait for Alpine to be ready
+document.addEventListener('alpine:init', () => {
+    console.log('Alpine.js initialized');
+});
+
+// Ensure showConfirm function is available
+window.showConfirm = function(dialogId) {
+    const dialog = document.getElementById(dialogId);
+    
+    if (!dialog) {
+        console.error('Dialog not found:', dialogId);
+        return;
+    }
+    
+    // Try using Alpine's global Alpine object if available
+    if (window.Alpine) {
+        // Use Alpine.$data to access the component's data
+        const component = window.Alpine.$data(dialog);
+        if (component) {
+            component.open = true;
+            return;
+        }
+    }
+    
+    // Fallback to __x property
+    if (dialog.__x) {
+        dialog.__x.$data.open = true;
+        return;
+    }
+    
+    // If neither works, try dispatching an event
+    dialog.dispatchEvent(new CustomEvent('open-modal'));
+    console.warn('Could not open modal using Alpine.js, tried dispatching event');
+};
+</script>
+{% endblock %}

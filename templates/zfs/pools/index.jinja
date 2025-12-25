@@ -1,0 +1,261 @@
+{% extends "layout.jinja" %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Page Header -->
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+            <h1 class="text-3xl font-bold text-text-primary">ZFS Pools Management</h1>
+            <p class="text-text-secondary mt-1">Manage and monitor ZFS storage pools</p>
+        </div>
+        <div class="flex gap-2">
+            <a href="/zfs/pools/import/list" class="btn-info inline-flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path>
+                </svg>
+                Import Pool
+            </a>
+            <a href="/zfs/pools/create/form" class="btn-success inline-flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                </svg>
+                Create Pool
+            </a>
+        </div>
+    </div>
+
+    <!-- Success/Error Messages -->
+    {% if request.query_params.get('message') %}
+        {% with message=request.query_params.get('message') %}
+            {% include "partials/success.jinja" %}
+        {% endwith %}
+    {% endif %}
+    
+    {% if request.query_params.get('error') or error %}
+        {% with message=request.query_params.get('error') or error %}
+            {% include "partials/error.jinja" %}
+        {% endwith %}
+    {% endif %}
+
+    <!-- Pools List -->
+    {% if pools %}
+    <div class="card overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="min-w-full">
+                <thead class="bg-bg-elevated-2">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">Pool Name</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">Size</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">Allocated</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">Free</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">Fragmentation</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">Capacity</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">Dedup</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">Health</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-border-subtle">
+                    {% for pool in pools %}
+                    <tr class="hover:bg-bg-elevated-2 transition-colors">
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <a href="/zfs/pools/{{ pool.name }}" class="text-primary-400 hover:text-primary-300 font-semibold transition-colors">
+                                {{ pool.name }}
+                            </a>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-text-primary">{{ pool.size }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-text-primary">{{ pool.alloc }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-text-primary">{{ pool.free }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-text-primary">{{ pool.frag }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="flex items-center gap-2">
+                                <span class="text-text-primary">{{ pool.cap }}</span>
+                                {% set cap_val = pool.cap.rstrip('%') | int %}
+                                <div class="w-16 bg-bg-elevated-3 rounded-full h-2">
+                                    <div class="{% if cap_val > 90 %}bg-danger-500{% elif cap_val >= 80 %}bg-warning-500{% else %}bg-success-500{% endif %} h-2 rounded-full transition-all" style="width: {{ pool.cap }}"></div>
+                                </div>
+                            </div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-text-primary">{{ pool.dedup }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            {% if pool.health == 'ONLINE' %}
+                                <span class="badge-success">{{ pool.health }}</span>
+                            {% elif pool.health == 'DEGRADED' %}
+                                <span class="badge-warning">{{ pool.health }}</span>
+                            {% else %}
+                                <span class="badge-danger">{{ pool.health }}</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="flex items-center gap-2">
+                                <a href="/zfs/pools/{{ pool.name }}" 
+                                   class="inline-flex text-primary-400 hover:text-primary-300 transition-colors" 
+                                   title="View Details">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                                    </svg>
+                                </a>
+                                <a href="/zfs/pools/{{ pool.name }}/properties" 
+                                   class="inline-flex text-success-400 hover:text-success-300 transition-colors" 
+                                   title="Properties">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                    </svg>
+                                </a>
+                                <a href="/zfs/pools/{{ pool.name }}/history" 
+                                   class="inline-flex text-purple-400 hover:text-purple-300 transition-colors" 
+                                   title="History">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                    </svg>
+                                </a>
+                                <form method="post" action="/zfs/pools/{{ pool.name }}/scrub" id="form-scrub-{{ loop.index }}" style="display: inline;">
+                                    <button type="button"
+                                            class="inline-flex text-warning-400 hover:text-warning-300 transition-colors p-0 border-0 bg-transparent" 
+                                            title="Start Scrub"
+                                            onclick="showConfirm('confirm-scrub-{{ loop.index }}')">
+                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                                        </svg>
+                                    </button>
+                                </form>
+                                <a href="/zfs/pools/{{ pool.name }}/export/confirm" 
+                                   class="inline-flex text-danger-400 hover:text-danger-300 transition-colors" 
+                                   title="Export Pool">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                                    </svg>
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Pool Count Summary -->
+    <div class="text-text-secondary text-sm">
+        <p>Total Pools: <span class="font-semibold text-text-primary">{{ pools|length }}</span></p>
+    </div>
+    {% else %}
+    <!-- No Pools Found -->
+    <div class="card text-center py-12">
+        <div class="text-text-tertiary mb-4">
+            <svg class="mx-auto h-16 w-16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"></path>
+            </svg>
+        </div>
+        <h3 class="text-xl font-semibold text-text-primary mb-2">No ZFS Pools Found</h3>
+        <p class="text-text-secondary mb-6">Create a new pool or import an existing one to get started.</p>
+        <div class="flex gap-3 justify-center">
+            <a href="/zfs/pools/import/list" class="btn-info inline-flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path>
+                </svg>
+                Import Pool
+            </a>
+            <a href="/zfs/pools/create/form" class="btn-success inline-flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                </svg>
+                Create Pool
+            </a>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Confirmation Modals -->
+    {% if pools %}
+        {% for pool in pools %}
+        {% set id = 'confirm-scrub-' ~ loop.index %}
+        {% set title = 'Start Pool Scrub' %}
+        {% set message = 'Start scrub on pool ' ~ pool.name ~ '? This will verify data integrity and may take a while.' %}
+        {% set confirm_text = 'Start Scrub' %}
+        {% set confirm_class = 'warning' %}
+        {% set confirm_action = 'document.getElementById("form-scrub-' ~ loop.index ~ '").submit()' %}
+        {% include 'partials/confirm.jinja' %}
+        {% endfor %}
+    {% endif %}
+
+    <script>
+    // Ensure showConfirm function is available
+    window.showConfirm = function(dialogId) {
+        const dialog = document.getElementById(dialogId);
+        
+        if (!dialog) {
+            console.error('Dialog not found:', dialogId);
+            return;
+        }
+        
+        // Try using Alpine's global Alpine object if available
+        if (window.Alpine) {
+            // Use Alpine.$data to access the component's data
+            const component = window.Alpine.$data(dialog);
+            if (component) {
+                component.open = true;
+                return;
+            }
+        }
+        
+        // Fallback to __x property
+        if (dialog.__x) {
+            dialog.__x.$data.open = true;
+            return;
+        }
+        
+        // If neither works, try dispatching an event
+        dialog.dispatchEvent(new CustomEvent('open-modal'));
+        console.warn('Could not open modal using Alpine.js, tried dispatching event');
+    };
+    </script>
+
+    <!-- Legend -->
+    <div class="card-nested">
+        <h3 class="text-sm font-semibold text-text-primary mb-3">Quick Actions Guide</h3>
+        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 text-sm">
+            <div class="flex items-center gap-2 text-text-secondary">
+                <svg class="w-4 h-4 text-primary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                </svg>
+                <span>View Details</span>
+            </div>
+            <div class="flex items-center gap-2 text-text-secondary">
+                <svg class="w-4 h-4 text-success-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                </svg>
+                <span>Properties</span>
+            </div>
+            <div class="flex items-center gap-2 text-text-secondary">
+                <svg class="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                <span>History</span>
+            </div>
+            <div class="flex items-center gap-2 text-text-secondary">
+                <svg class="w-4 h-4 text-warning-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                </svg>
+                <span>Scrub</span>
+            </div>
+            <div class="flex items-center gap-2 text-text-secondary">
+                <svg class="w-4 h-4 text-danger-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                </svg>
+                <span>Export</span>
+            </div>
+        </div>
+        <div class="mt-4 pt-4 border-t border-border-subtle">
+            <p class="text-xs text-text-tertiary flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                Pool destruction must be performed manually via command line for safety.
+            </p>
+        </div>
+    </div>
+</div>
+{% endblock %}

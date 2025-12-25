@@ -1,0 +1,209 @@
+{% extends "layout.jinja" %}
+
+{% set active_page = 'utils' %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <!-- Breadcrumb Navigation -->
+    <nav class="text-sm mb-6 text-text-tertiary">
+        <a href="/utils/" class="hover:text-primary-400">Utilities</a> 
+        <span class="mx-2">/</span> 
+        <span class="text-text-primary">ZFS Scrub Scheduling</span>
+    </nav>
+
+    <!-- Page Header -->
+    <div class="flex justify-between items-center mb-6">
+        <h1 class="text-3xl font-bold text-text-primary">Scheduled ZFS Scrubs</h1>
+        <a href="/utils/" class="btn-secondary hover:bg-bg-elevated-2 text-text-primary px-4 py-2 rounded inline-block">
+            ← Back to Utilities
+        </a>
+    </div>
+
+    <!-- Success/Error Messages -->
+    {% if request.query_params.get('message') %}
+    <div class="bg-success-900/30 border-2 border-success-500/50 text-success-400 px-4 py-3 rounded mb-4">
+        {{ request.query_params.get('message') }}
+    </div>
+    {% endif %}
+    
+    {% if request.query_params.get('error') %}
+    <div class="bg-danger-900/30 border-2 border-danger-500/50 text-danger-400 px-4 py-3 rounded mb-4">
+        <strong>Error:</strong> {{ request.query_params.get('error') }}
+    </div>
+    {% endif %}
+
+    {% if error %}
+    <div class="bg-danger-900/30 border-2 border-danger-500/50 text-danger-400 px-4 py-3 rounded mb-4">
+        <strong>Error:</strong> {{ error }}
+    </div>
+    {% endif %}
+
+    <!-- Create New Schedule Form -->
+    <div class="card mb-6">
+        <div class="card-body">
+            <h2 class="text-xl font-bold text-text-primary mb-4">Create Scheduled Scrub</h2>
+            <form method="post" action="/utils/scrub-scheduling/create" class="space-y-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-text-secondary text-sm font-semibold mb-2">ZFS Pool</label>
+                        <select name="pool" required class="w-full bg-bg-elevated-2 text-text-primary rounded px-3 py-2 border border-border-subtle focus:border-primary-500 focus:outline-none">
+                            <option value="">Select a pool...</option>
+                            {% for pool in pools %}
+                            <option value="{{ pool }}">{{ pool }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-text-secondary text-sm font-semibold mb-2">Schedule (Cron Format)</label>
+                        <input type="text" name="schedule" required placeholder="0 2 * * 0" 
+                               class="w-full bg-bg-elevated-2 text-text-primary rounded px-3 py-2 border border-border-subtle focus:border-primary-500 focus:outline-none">
+                        <p class="text-text-tertiary text-xs mt-1">Example: "0 2 * * 0" = Weekly on Sunday at 2am</p>
+                    </div>
+                </div>
+                <div class="flex items-center">
+                    <input type="checkbox" name="enabled" id="enabled" value="true" checked class="mr-2">
+                    <label for="enabled" class="text-text-secondary text-sm">Enabled</label>
+                </div>
+                <button type="submit" class="btn-primary">
+                    <svg class="w-5 h-5 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                    </svg>
+                    Create Schedule
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Scheduled Scrubs List -->
+    {% if scheduled_scrubs and scheduled_scrubs|length > 0 %}
+    <div class="card">
+        <div class="card-body p-0">
+            <div class="p-6 border-b border-border-subtle">
+                <h2 class="text-xl font-bold text-text-primary">Active Schedules</h2>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="min-w-full">
+                    <thead class="bg-bg-elevated-2 text-text-secondary">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">Pool</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">Schedule</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">Status</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">Created</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-bg-elevated divide-y divide-border-subtle">
+                        {% for schedule in scheduled_scrubs %}
+                        <tr class="hover:bg-bg-elevated-2 transition-colors">
+                            <td class="px-6 py-4 whitespace-nowrap text-text-primary font-mono">{{ schedule.pool }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-text-secondary font-mono text-sm">{{ schedule.schedule }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                {% if schedule.enabled %}
+                                <span class="badge-success text-xs">
+                                    Enabled
+                                </span>
+                                {% else %}
+                                <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-bg-elevated-2 text-text-tertiary">
+                                    Disabled
+                                </span>
+                                {% endif %}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-text-tertiary text-sm">{{ schedule.created_at[:10] if schedule.created_at else 'N/A' }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm">
+                                <div class="flex space-x-2">
+                                    <form method="post" action="/utils/scrub-scheduling/{{ schedule.id }}/toggle" class="inline">
+                                        <button type="submit" 
+                                                class="text-warning-400 hover:text-warning-300" 
+                                                title="Toggle Enabled/Disabled">
+                                            {% if schedule.enabled %}⏸️{% else %}▶️{% endif %}
+                                        </button>
+                                    </form>
+                                    <form method="post" action="/utils/scrub-scheduling/{{ schedule.id }}/delete" class="inline" id="form-delete-scrub-{{ schedule.id }}">
+                                        <button type="button" 
+                                                class="text-danger-400 hover:text-danger-300" 
+                                                title="Delete Schedule"
+                                                onclick="showConfirm('modal-delete-scrub-{{ schedule.id }}')">
+                                            🗑️
+                                        </button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Schedule Count -->
+    <div class="mt-4 text-text-tertiary text-sm">
+        <p>Total Schedules: {{ scheduled_scrubs|length }}</p>
+    </div>
+    {% else %}
+    <!-- No Schedules Found -->
+    <div class="card">
+        <div class="card-body text-center py-12">
+            <div class="text-text-tertiary mb-4">
+                <svg class="mx-auto h-12 w-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+            </div>
+            <h3 class="text-lg font-medium text-text-primary mb-2">No Scheduled Scrubs</h3>
+            <p class="text-text-secondary">Create a schedule above to automatically scrub your ZFS pools.</p>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Cron Format Help -->
+    <div class="mt-6 bg-info-900/30 border-2 border-info-500/50 text-info-400 px-4 py-3 rounded">
+        <strong><svg class="w-5 h-5 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg> Cron Schedule Format:</strong>
+        <div class="mt-2 text-sm">
+            <p class="mb-2">Format: <code class="bg-info-950 px-2 py-1 rounded">minute hour day month weekday</code></p>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-2 mt-3">
+                <div>
+                    <code class="bg-info-950 px-2 py-1 rounded">0 2 * * 0</code> - Weekly on Sunday at 2:00 AM
+                </div>
+                <div>
+                    <code class="bg-info-950 px-2 py-1 rounded">0 3 1 * *</code> - Monthly on 1st at 3:00 AM
+                </div>
+                <div>
+                    <code class="bg-info-950 px-2 py-1 rounded">0 2 * * *</code> - Daily at 2:00 AM
+                </div>
+                <div>
+                    <code class="bg-info-950 px-2 py-1 rounded">0 4 1,15 * *</code> - 1st and 15th of month at 4:00 AM
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Important Note -->
+    <div class="mt-4 bg-warning-900/30 border-2 border-warning-500/50 text-warning-400 px-4 py-3 rounded">
+        <strong><svg class="w-5 h-5 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                    </svg> Note:</strong>
+        <p class="mt-1 text-sm">
+            This interface provides basic scheduling functionality. For production use, consider configuring cron jobs 
+            directly or using system scheduling. Scheduled scrubs created here are stored in memory and will be lost on 
+            application restart unless persisted to a database. Regular scrubbing helps maintain ZFS pool integrity and 
+            detect data corruption early.
+        </p>
+    </div>
+</div>
+
+<!-- Confirmation Modals -->
+{% if scheduled_scrubs and scheduled_scrubs|length > 0 %}
+    {% for schedule in scheduled_scrubs %}
+    {% set modal_id = 'modal-delete-scrub-' + schedule.id|string %}
+    {% set modal_title = 'Delete Schedule' %}
+    {% set modal_message = 'Delete this scheduled scrub?' %}
+    {% set confirm_text = 'Delete' %}
+    {% set confirm_class = 'danger' %}
+    {% set action_url = '/utils/scrub-scheduling/' + schedule.id|string + '/delete' %}
+    {% set method = 'post' %}
+    {% include 'partials/confirm.jinja' %}
+    {% endfor %}
+{% endif %}
+{% endblock %}

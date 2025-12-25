@@ -1,0 +1,282 @@
+{% extends "layout.jinja" %}
+
+{% set active_page = 'shell' %}
+
+{% block content %}
+    <div class="container-page animate-slide-in">
+        <!-- Breadcrumb Navigation -->
+        <nav class="text-sm mb-6 text-text-tertiary">
+            <a href="/utils" class="hover:text-primary-400">Utilities</a> 
+            <span class="mx-2">/</span> 
+            <span class="text-text-primary">Shell Terminal</span>
+        </nav>
+
+        <!-- Page Header -->
+        <div class="mb-6 flex items-start justify-between">
+            <div>
+                <h1 class="text-3xl font-bold text-text-primary mb-2">Shell Terminal</h1>
+                <p class="text-text-secondary">Execute shell commands directly from the web interface</p>
+            </div>
+            <div class="flex gap-2">
+                <form id="browseFilesForm" method="post" action="/utils/files/list">
+                    <input type="hidden" name="directory" id="browseDirectory" value="{{ cwd }}">
+                    <button type="submit" class="btn-primary flex items-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/>
+                        </svg>
+                        Browse Files
+                    </button>
+                </form>
+                <a href="/utils/shell/download-history" class="btn-success flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                    </svg>
+                    Download History
+                </a>
+            </div>
+        </div>
+
+        <!-- Info and Current Directory Box -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+            <div class="card-nested bg-info-900/30 border-info-900">
+                <div class="flex items-start gap-3">
+                    <svg class="w-5 h-5 text-info-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                    <div class="text-sm text-text-secondary">
+                        <strong class="text-info-400">Terminal Access:</strong> Commands are executed with server privileges. Exercise caution and avoid destructive operations.
+                    </div>
+                </div>
+            </div>
+            <div class="card-nested bg-primary-900/30 border-primary-900">
+                <div class="flex items-start gap-3">
+                    <svg class="w-5 h-5 text-primary-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/>
+                    </svg>
+                    <div class="text-sm">
+                        <strong class="text-primary-400">Current Directory:</strong>
+                        <div id="cwd" class="mt-1">
+                            <span class="text-primary-400 font-mono text-sm">{{ cwd }}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Terminal Card -->
+        <div class="card">
+            <div class="card-body p-0 overflow-hidden">
+                <div id="shell" class="flex flex-col gap-1 h-[calc(80vh)] bg-gray-950 p-4 text-text-primary overflow-y-scroll font-mono text-sm">
+                    <div id="history">
+                        <!-- Command history will appear here -->
+                    </div>
+                    <div id="shellInputDiv" class="flex items-center mt-2">
+                        <span class="font-bold text-success-400">#</span>
+                        <form id="inputForm" method="post" action="/utils/shell/command" class="flex-1">
+                            <input 
+                                id="shellInput" 
+                                class="w-full ml-2 bg-transparent focus:outline-none caret-success-400 text-text-primary placeholder-text-tertiary" 
+                                name="input_command" 
+                                type="text"
+                                placeholder="Enter command..."
+                                autocomplete="off"
+                            >
+                            <input 
+                                hx-post="/utils/shell/command" 
+                                hx-target="#history" 
+                                hx-swap="beforeend scroll:#shell:bottom"
+                                hx-on:htmx:after-request="document.getElementById('inputForm').reset(); htmx.ajax('GET', '/utils/shell/cwd', {target:'#cwd', swap:'innerHTML'});" 
+                                type="submit" 
+                                hidden 
+                            />
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Browse Files CTA -->
+        <div class="card-nested mt-6 bg-primary-900/30 border-primary-900">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <svg class="w-6 h-6 text-primary-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/>
+                    </svg>
+                    <div>
+                        <p class="font-semibold text-text-primary">Open this directory in the Files tab to view or edit files</p>
+                        <p class="text-sm text-text-secondary mt-1">Current directory: <span id="cwd-display-bottom" class="font-mono text-primary-400">{{ cwd }}</span></p>
+                    </div>
+                </div>
+                <form method="post" action="/utils/files/list">
+                    <input type="hidden" name="directory" class="browse-directory-input" value="{{ cwd }}">
+                    <button type="submit" class="btn-primary flex items-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/>
+                        </svg>
+                        Browse Files
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Tips Section -->
+        <div class="card-nested mt-6">
+            <h3 class="text-lg font-semibold text-text-primary mb-3 flex items-center gap-2">
+                <svg class="w-5 h-5 text-warning-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+                </svg>
+                Terminal Tips
+            </h3>
+            <ul class="space-y-2 text-sm text-text-secondary">
+                <li class="flex items-start gap-2">
+                    <svg class="w-4 h-4 text-primary-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                    </svg>
+                    Click anywhere to focus the input field
+                </li>
+                <li class="flex items-start gap-2">
+                    <svg class="w-4 h-4 text-primary-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                    </svg>
+                    Press Enter to execute commands
+                </li>
+                <li class="flex items-start gap-2">
+                    <svg class="w-4 h-4 text-primary-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                    </svg>
+                    Command history scrolls automatically
+                </li>
+                <li class="flex items-start gap-2">
+                    <svg class="w-4 h-4 text-primary-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                    </svg>
+                    Press <code class="px-1 py-0.5 bg-bg-elevated rounded text-xs">Tab</code> for command and path completion
+                </li>
+                <li class="flex items-start gap-2">
+                    <svg class="w-4 h-4 text-primary-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                    </svg>
+                    Press <code class="px-1 py-0.5 bg-bg-elevated rounded text-xs">Tab</code> multiple times to cycle through matches
+                </li>
+                <li class="flex items-start gap-2">
+                    <svg class="w-4 h-4 text-primary-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                    </svg>
+                    Use <code class="px-1 py-0.5 bg-bg-elevated rounded text-xs">cd</code> commands to navigate directories
+                </li>
+                <li class="flex items-start gap-2">
+                    <svg class="w-4 h-4 text-primary-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                    </svg>
+                    Download full command history with the button above
+                </li>
+            </ul>
+        </div>
+    </div>
+{% endblock %}
+
+{% block after_body %}
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            var myInput = document.getElementById("shellInput");
+
+            // Auto-focus on page load
+            myInput.focus();
+
+            // Re-focus when clicking anywhere
+            document.addEventListener("click", function(event) {
+                if (event.target !== myInput) {
+                    myInput.focus();
+                }
+            });
+
+            // Tab completion handling
+            let completionIndex = -1;
+            let completionSuggestions = [];
+            
+            document.addEventListener("keydown", async function(event) {
+                if (event.key === "Tab") {
+                    event.preventDefault();
+                    
+                    const input = myInput.value;
+                    
+                    // If we're cycling through suggestions
+                    if (completionSuggestions.length > 0) {
+                        completionIndex = (completionIndex + 1) % completionSuggestions.length;
+                        autocompleteFill(completionSuggestions[completionIndex], input);
+                    } else {
+                        // Get new suggestions
+                        await getCompletions(input);
+                        if (completionSuggestions.length > 0) {
+                            completionIndex = 0;
+                            autocompleteFill(completionSuggestions[0], input);
+                        }
+                    }
+                } else if (event.key !== "Shift") {
+                    // Reset completion on any other key
+                    completionIndex = -1;
+                    completionSuggestions = [];
+                }
+            });
+            
+            async function getCompletions(partial) {
+                try {
+                    const formData = new FormData();
+                    formData.append('partial', partial);
+                    
+                    const response = await fetch('/utils/shell/autocomplete', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    
+                    const data = await response.json();
+                    completionSuggestions = data.suggestions || [];
+                } catch (error) {
+                    console.error('Autocomplete error:', error);
+                    completionSuggestions = [];
+                }
+            }
+            
+            function autocompleteFill(suggestion, originalInput) {
+                // Find the last word/path in the input
+                const parts = originalInput.split(/\s+/);
+                if (parts.length > 0) {
+                    parts[parts.length - 1] = suggestion;
+                    myInput.value = parts.join(' ');
+                } else {
+                    myInput.value = suggestion;
+                }
+            }
+            
+            // Update browse files button directory when CWD changes
+            const observer = new MutationObserver(function(mutations) {
+                mutations.forEach(function(mutation) {
+                    if (mutation.type === 'childList' || mutation.type === 'characterData') {
+                        const cwdElement = document.getElementById('cwd');
+                        if (cwdElement) {
+                            const cwdText = cwdElement.textContent.trim();
+                            // Update both browse directory inputs
+                            document.getElementById('browseDirectory').value = cwdText;
+                            const bottomInputs = document.querySelectorAll('.browse-directory-input');
+                            bottomInputs.forEach(input => input.value = cwdText);
+                            // Update bottom display
+                            const cwdDisplayBottom = document.getElementById('cwd-display-bottom');
+                            if (cwdDisplayBottom) {
+                                cwdDisplayBottom.textContent = cwdText;
+                            }
+                        }
+                    }
+                });
+            });
+            
+            const cwdElement = document.getElementById('cwd');
+            if (cwdElement) {
+                observer.observe(cwdElement, { 
+                    childList: true, 
+                    characterData: true, 
+                    subtree: true 
+                });
+            }
+        });
+    </script>
+{% endblock %}

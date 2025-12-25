@@ -1,0 +1,121 @@
+{% extends "layout.jinja" %}
+
+{% set active_page = 'utils' %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-6">
+    <!-- Breadcrumb Navigation -->
+    <nav class="text-sm mb-6 text-text-tertiary">
+        <a href="/utils" class="hover:text-primary-400">Utilities</a> 
+        <span class="mx-2">/</span> 
+        <a href="/utils/ssh" class="hover:text-primary-400">SSH Connection Manager</a>
+        <span class="mx-2">/</span>
+        <span class="text-text-primary">Edit Connection</span>
+    </nav>
+
+    <!-- Page Header -->
+    <div class="mb-6">
+        <h1 class="text-2xl font-bold text-text-primary">Edit SSH Connection</h1>
+        <p class="text-text-secondary mt-1">
+            Update connection details (SSH keys cannot be changed - recreate connection if needed)
+        </p>
+    </div>
+
+    <!-- Edit Connection Form -->
+    <form method="post" action="/utils/ssh/{{ connection.id }}/edit" class="card">
+        <div class="card-body space-y-6">
+            <!-- Connection Name -->
+            <div>
+                <label for="name" class="form-label">
+                    Connection Name <span class="text-danger-400">*</span>
+                </label>
+                <input 
+                    type="text" 
+                    name="name" 
+                    id="name" 
+                    required 
+                    class="form-input" 
+                    value="{{ connection.name }}"
+                >
+            </div>
+
+            <!-- Host -->
+            <div>
+                <label for="host" class="form-label">
+                    Host (IP or Hostname) <span class="text-danger-400">*</span>
+                </label>
+                <input 
+                    type="text" 
+                    name="host" 
+                    id="host" 
+                    required 
+                    class="form-input" 
+                    value="{{ connection.host }}"
+                >
+            </div>
+
+            <!-- Port -->
+            <div>
+                <label for="port" class="form-label">
+                    SSH Port
+                </label>
+                <input 
+                    type="number" 
+                    name="port" 
+                    id="port" 
+                    class="form-input"
+                    value="{{ connection.port }}"
+                >
+            </div>
+
+            <!-- Username -->
+            <div>
+                <label for="username" class="form-label">
+                    Username <span class="text-danger-400">*</span>
+                </label>
+                <input 
+                    type="text" 
+                    name="username" 
+                    id="username" 
+                    required 
+                    class="form-input" 
+                    value="{{ connection.username }}"
+                >
+            </div>
+
+            <!-- Notes -->
+            <div>
+                <label for="notes" class="form-label">
+                    Notes (Optional)
+                </label>
+                <textarea 
+                    name="notes" 
+                    id="notes" 
+                    rows="3" 
+                    class="form-input"
+                >{{ connection.notes if connection.notes else '' }}</textarea>
+            </div>
+
+            <!-- SSH Key Info (Read-only) -->
+            <div class="card-nested bg-info-500/10 border-info-500/30">
+                <div class="flex gap-3">
+                    <svg class="w-5 h-5 text-info-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                    <div class="text-sm">
+                        <p class="font-medium text-text-primary mb-2">SSH Key Information</p>
+                        <p class="text-text-secondary mb-2">Fingerprint: <span class="font-mono text-xs">{{ connection.fingerprint }}</span></p>
+                        <p class="text-text-secondary text-xs">To change SSH keys, delete this connection and create a new one.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Form Footer -->
+        <div class="card-footer flex justify-end gap-3">
+            <a href="/utils/ssh" class="btn-secondary">Cancel</a>
+            <button type="submit" class="btn-primary">Update Connection</button>
+        </div>
+    </form>
+</div>
+{% endblock %}

@@ -2,10 +2,13 @@
 
 A modern web-based management interface for ZFS pools, datasets, snapshots, and SMART disk monitoring built with Python FastAPI and HTMX.
 
+![webzfs dashboard](screenshots/dashboard-v0.52.png)
+
+
 ## Features
 
 - **ZFS Pool Management**: Create, import, export, scrub, and monitor ZFS pools
-- **Dataset Management**: Create, destroy, rename, mount/unmount datasets and volumes
+- **Dataset Management**: Create, rename, mount/unmount datasets and volumes
 - **Snapshot Management**: Create, destroy, rollback, clone, and diff snapshots
 - **Replication Management**: Native ZFS send/receive and Sanoid/Syncoid integration
 - **Performance Monitoring**: Real-time pool I/O stats, ARC statistics, and ZFS processes
@@ -13,6 +16,7 @@ A modern web-based management interface for ZFS pools, datasets, snapshots, and 
 - **SMART Monitoring**: Disk health, attributes, test scheduling, and error logs
 - **Fleet Monitoring**: Monitor multiple remote ZFS servers (optional)
 - **Modern UI**: Built with Tailwind CSS and HTMX, utilizing minimal JavaScript
+- **User Management**: Relies on PAM to interact with existing local *nix user accounts on the system
 
 ## Platform Support
 
@@ -68,6 +72,7 @@ The installation script automatically:
 
 ### Running
 
+On Linux:
 ```bash
 # Start the application
 sudo -u webzfs /opt/webzfs/run.sh
@@ -75,6 +80,16 @@ sudo -u webzfs /opt/webzfs/run.sh
 # Or for development mode
 sudo -u webzfs /opt/webzfs/run_dev.sh
 ```
+
+On FreeBSD the application must be run as root to avoid issues with PAM:
+```bash
+# Start the application
+/opt/webzfs/run.sh
+
+# Or for development mode
+/opt/webzfs/run_dev.sh
+```
+
 
 ### Access
 
@@ -171,9 +186,10 @@ MIT License - See [LICENSE](LICENSE) file for details.
 
 ## AI Usage Disclosure
 
-AI was used to help add comments to the source files as well as to help clean up the build and installation documentation. 
-AI was used to implement Tailwind.CSS which massively improved my previously hideous CSS. (seriously it was eyebleedingly bad, tailwind is much much better) 
-AI was used to help implement the modal JS confirmation dialogs for certain operations, because my prior attempts were rather buggy and needed to be cleaned up. 
+- AI was used to help add comments to the source files as well as to help clean up the build and installation documentation. 
+- AI was used to implement Tailwind.CSS which massively improved my previously hideous CSS. (seriously it was eyebleedingly bad, tailwind is much much better) 
+- AI was used to help implement the modal JS confirmation dialogs for certain operations, because my prior attempts were rather buggy and needed to be cleaned up. 
+- [Ballistic-CodeLlama-34B](https://huggingface.co/BallisticAI/Ballistic-CodeLlama-34B-v1)
 
 ## Dev Comments
 

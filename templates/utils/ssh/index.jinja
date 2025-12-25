@@ -1,0 +1,293 @@
+{% extends "layout.jinja" %}
+
+{% set active_page = 'utils' %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-6">
+    <!-- Breadcrumb Navigation -->
+    <nav class="text-sm mb-6 text-text-tertiary">
+        <a href="/utils" class="hover:text-primary-400">Utilities</a> 
+        <span class="mx-2">/</span> 
+        <span class="text-text-primary">SSH Connection Manager</span>
+    </nav>
+
+    <!-- Page Header -->
+    <div class="flex items-center justify-between mb-6">
+        <div>
+            <h1 class="text-2xl font-bold text-text-primary">SSH Connection Manager</h1>
+            <p class="text-text-secondary mt-1">
+                Manage SSH connections for Fleet Monitoring and ZFS Replication
+            </p>
+        </div>
+        <a href="/utils/ssh/add" class="btn-primary">
+            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+            </svg>
+            Add Connection
+        </a>
+    </div>
+
+    <!-- Info Banner -->
+    <div class="card-nested bg-info-500/10 border-info-500/30 mb-6">
+        <div class="flex gap-3">
+            <svg class="w-5 h-5 text-info-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+            <div class="text-sm text-text-secondary">
+                <p class="font-medium text-text-primary mb-2">About SSH Connections</p>
+                <ul class="list-disc list-inside space-y-1">
+                    <li>Connections use secure key-based authentication (more secure than passwords)</li>
+                    <li>During setup, a password is used once to install the SSH key</li>
+                    <li>After setup, all operations use the generated SSH key</li>
+                    <li>Connections can be reused in Fleet Monitoring and ZFS Replication</li>
+                    <li>To modify a connection, delete it and create a new one</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- Connections Table -->
+    {% if connections %}
+    <div class="card">
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-border-default">
+                <thead class="bg-bg-elevated-2">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
+                            Name
+                        </th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
+                            Connection
+                        </th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
+                            Status
+                        </th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
+                            Used By
+                        </th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
+                            Last Tested
+                        </th>
+                        <th class="px-6 py-3 text-right text-xs font-medium text-text-secondary uppercase tracking-wider">
+                            Actions
+                        </th>
+                    </tr>
+                </thead>
+                <tbody class="bg-bg-elevated divide-y divide-border-default">
+                    {% for conn in connections %}
+                    <tr class="hover:bg-bg-elevated-2">
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div>
+                                <div class="text-sm font-medium text-text-primary">{{ conn.name }}</div>
+                                {% if conn.notes %}
+                                <div class="text-xs text-text-tertiary mt-1">{{ conn.notes }}</div>
+                                {% endif %}
+                            </div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm text-text-primary font-mono">{{ conn.username }}@{{ conn.host }}</div>
+                            <div class="text-xs text-text-tertiary">Port: {{ conn.port }}</div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            {% if conn.status == 'active' %}
+                            <span class="badge-success">Active</span>
+                            {% else %}
+                            <span class="badge-danger">Error</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="flex gap-1">
+                                {% for feature in conn.used_by %}
+                                <span class="badge-info text-xs">{{ feature }}</span>
+                                {% endfor %}
+                                {% if not conn.used_by %}
+                                <span class="text-xs text-text-tertiary">Not in use</span>
+                                {% endif %}
+                            </div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-text-secondary">
+                            {% if conn.last_tested %}
+                            {{ conn.last_tested[:19] }}
+                            {% else %}
+                            Never
+                            {% endif %}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                            <div class="flex items-center justify-end gap-2">
+                                <button 
+                                    hx-post="/utils/ssh/{{ conn.id }}/test"
+                                    hx-target="#toast-container"
+                                    hx-swap="innerHTML"
+                                    class="btn-sm btn-success" 
+                                    title="Test Connection"
+                                >
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                                    </svg>
+                                </button>
+                                {% if conn.id %}
+                                <form method="post" action="/utils/ssh/delete" class="inline" id="form-delete-connection-{{ loop.index }}">
+                                    <input type="hidden" name="connection_id" value="{{ conn.id }}">
+                                    <input type="hidden" name="remove_from_remote" id="remove_from_remote_{{ loop.index }}" value="false">
+                                    <button 
+                                        type="button"
+                                        onclick="showDeleteConfirm('modal-delete-connection-{{ loop.index }}', {{ loop.index }})"
+                                        class="btn-sm btn-danger"
+                                        title="Delete"
+                                    >
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                                        </svg>
+                                    </button>
+                                </form>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% else %}
+    <!-- Empty State -->
+    <div class="card text-center py-12">
+        <svg class="mx-auto h-12 w-12 text-text-tertiary mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/>
+        </svg>
+        <h3 class="text-lg font-medium text-text-primary mb-2">No SSH Connections</h3>
+        <p class="text-text-secondary mb-4">Get started by adding your first SSH connection</p>
+        <a href="/utils/ssh/add" class="btn-primary inline-flex items-center">
+            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+            </svg>
+            Add Connection
+        </a>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Toast Container for HTMX responses -->
+<div id="toast-container" class="fixed top-4 right-4 z-50"></div>
+
+<!-- Delete Confirmation Modals -->
+{% if connections %}
+    {% for conn in connections %}
+    <div 
+        id="modal-delete-connection-{{ loop.index }}"
+        class="modal-overlay"
+        x-data="{ open: false, removeFromRemote: false }"
+        x-show="open"
+        x-on:keydown.escape.window="open = false"
+        style="display: none;"
+        x-transition:enter="transition ease-out duration-200"
+        x-transition:enter-start="opacity-0"
+        x-transition:enter-end="opacity-100"
+        x-transition:leave="transition ease-in duration-150"
+        x-transition:leave-start="opacity-100"
+        x-transition:leave-end="opacity-0"
+    >
+        {# Backdrop #}
+        <div class="fixed inset-0 bg-black/80 backdrop-blur-sm" x-on:click="open = false"></div>
+
+        {# Dialog Container #}
+        <div class="fixed inset-0 z-50 overflow-y-auto">
+            <div class="flex min-h-full items-center justify-center p-4">
+                {# Dialog Content #}
+                <div 
+                    class="modal modal-sm"
+                    x-transition:enter="transition ease-out duration-200"
+                    x-transition:enter-start="opacity-0 translate-y-4 scale-95"
+                    x-transition:enter-end="opacity-100 translate-y-0 scale-100"
+                    x-transition:leave="transition ease-in duration-150"
+                    x-transition:leave-start="opacity-100 translate-y-0 scale-100"
+                    x-transition:leave-end="opacity-0 translate-y-4 scale-95"
+                    x-on:click.stop
+                >
+                    {# Warning Icon #}
+                    <div class="flex items-center justify-center w-12 h-12 mx-auto mb-4 rounded-full bg-danger-900/50 border-2 border-danger-500">
+                        <svg class="w-6 h-6 text-danger-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                        </svg>
+                    </div>
+
+                    {# Title #}
+                    <h3 class="text-xl font-semibold text-text-primary text-center mb-2">
+                        Delete SSH Connection
+                    </h3>
+
+                    {# Message #}
+                    <p class="text-text-secondary text-center mb-4">
+                        Are you sure you want to delete the SSH connection "<span class="font-semibold text-text-primary">{{ conn.name }}</span>"?
+                    </p>
+
+                    {# Checkbox for removing from remote #}
+                    <div class="mb-6">
+                        <label class="flex items-center justify-center gap-2 cursor-pointer">
+                            <input type="checkbox" x-model="removeFromRemote" class="form-checkbox">
+                            <span class="text-sm text-text-secondary">Also remove SSH key from remote server</span>
+                        </label>
+                    </div>
+
+                    {# Actions #}
+                    <div class="flex space-x-3">
+                        {# Cancel Button #}
+                        <button
+                            type="button"
+                            class="btn-secondary flex-1"
+                            x-on:click="open = false"
+                        >
+                            Cancel
+                        </button>
+
+                        {# Confirm Button #}
+                        <button
+                            type="button"
+                            class="btn-danger flex-1"
+                            x-on:click="submitDelete({{ loop.index }}, removeFromRemote); open = false"
+                        >
+                            Delete Connection
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+{% endif %}
+
+<script>
+// Function to show delete confirmation dialog
+function showDeleteConfirm(dialogId, index) {
+    const dialog = document.getElementById(dialogId);
+    if (dialog) {
+        // Try using Alpine
+        if (window.Alpine) {
+            const component = window.Alpine.$data(dialog);
+            if (component) {
+                component.open = true;
+                component.removeFromRemote = false;
+                return;
+            }
+        }
+        // Fallback to __x property
+        if (dialog.__x) {
+            dialog.__x.$data.open = true;
+            dialog.__x.$data.removeFromRemote = false;
+            return;
+        }
+    }
+    console.error('Could not open dialog:', dialogId);
+}
+
+// Function to submit delete form with checkbox value
+function submitDelete(index, removeFromRemote) {
+    const form = document.getElementById('form-delete-connection-' + index);
+    const checkbox = document.getElementById('remove_from_remote_' + index);
+    if (form && checkbox) {
+        checkbox.value = removeFromRemote ? 'true' : 'false';
+        form.submit();
+    }
+}
+</script>
+{% endblock %}

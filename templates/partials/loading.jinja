@@ -1,0 +1,54 @@
+{# 
+  Loading spinner component
+  
+  Parameters:
+  - size: spinner size - 'sm', 'md', 'lg', 'xl' (default: 'md')
+  - text: optional loading text
+  - fullscreen: whether to show as fullscreen overlay (default: false)
+  - classes: additional CSS classes
+  
+  Usage:
+  {% include 'partials/loading.jinja' with {'text': 'Loading...'} %}
+  Or use as HTMX indicator with class="htmx-indicator"
+#}
+
+{% if fullscreen %}
+  {# Fullscreen Loading Overlay #}
+  <div class="loading-overlay">
+    <div class="flex flex-col items-center justify-center">
+      <div class="loading-spinner loading-spinner-{{ size|default('lg') }}">
+        <svg class="animate-spin" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+      </div>
+      {% if text %}
+        <p class="mt-4 text-text-secondary text-lg font-medium">{{ text }}</p>
+      {% endif %}
+    </div>
+  </div>
+{% else %}
+  {# Inline Loading Spinner #}
+  <div class="loading-inline {{ classes }}">
+    <div class="loading-spinner loading-spinner-{{ size|default('md') }}">
+      <svg class="animate-spin" fill="none" viewBox="0 0 24 24">
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+      </svg>
+    </div>
+    {% if text %}
+      <span class="ml-3 text-text-secondary font-medium">{{ text }}</span>
+    {% endif %}
+  </div>
+{% endif %}
+
+{# HTMX Loading Indicator Example #}
+{# 
+  Add to buttons or forms:
+  <button hx-post="/api/action" class="btn-primary">
+    <span class="htmx-indicator">
+      {% include 'partials/loading.jinja' with {'size': 'sm'} %}
+    </span>
+    Submit
+  </button>
+#}

@@ -1,0 +1,374 @@
+{% extends "layout.jinja" %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Page Header -->
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+            <h1 class="text-3xl font-bold text-text-primary">ZFS Datasets Management</h1>
+            <nav class="flex items-center text-sm text-text-secondary mt-1">
+                <a href="/zfs/pools" class="hover:text-text-primary transition-colors">Pools</a>
+                <svg class="w-4 h-4 mx-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                </svg>
+                <span class="text-text-primary font-medium">Datasets</span>
+            </nav>
+        </div>
+        <a href="/zfs/datasets/create/form" class="btn-success inline-flex items-center gap-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+            </svg>
+            Create Dataset
+        </a>
+    </div>
+
+    <!-- Success/Error Messages -->
+    {% if request.query_params.get('message') %}
+        {% with message=request.query_params.get('message') %}
+            {% include "partials/success.jinja" %}
+        {% endwith %}
+    {% endif %}
+    
+    {% if request.query_params.get('error') %}
+        {% with message=request.query_params.get('error') %}
+            {% include "partials/error.jinja" %}
+        {% endwith %}
+    {% endif %}
+
+    {% if error %}
+        {% with message=error %}
+            {% include "partials/error.jinja" %}
+        {% endwith %}
+    {% endif %}
+
+    <!-- Datasets List Grouped by Pool -->
+    {% if pools %}
+    <div class="space-y-4">
+        {% for pool_name, pool_datasets in pools %}
+        <details class="card group" open>
+            <summary class="cursor-pointer select-none px-6 py-4 flex items-center justify-between hover:bg-bg-elevated-2 transition-colors rounded-t-lg">
+                <div class="flex items-center gap-3">
+                    <svg class="w-5 h-5 text-primary-400 transition-transform group-open:rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                    </svg>
+                    <h2 class="text-xl font-semibold text-text-primary">Pool: {{ pool_name }}</h2>
+                    <span class="badge-info">{{ pool_datasets|length }} dataset{{ 's' if pool_datasets|length != 1 else '' }}</span>
+                </div>
+            </summary>
+            
+            {# Macro for rendering dataset rows recursively #}
+            {% macro render_dataset_row(dataset, depth=0, parent_id='') %}
+            {% set row_id = 'ds-' ~ dataset.name.replace('/', '-') %}
+            {% set is_parent = dataset.has_children %}
+            <tr class="hover:bg-bg-elevated-2 transition-colors dataset-row" id="{{ row_id }}" data-parent="{{ parent_id }}">
+                <td class="py-2 whitespace-nowrap" style="padding-left: {{ 0.75 + (depth * 1.5) }}rem;">
+                    <div class="flex items-center gap-1">
+                        {% if is_parent %}
+                        <button onclick="toggleDataset('{{ row_id }}')" class="dataset-toggle text-text-tertiary hover:text-text-primary transition-colors p-0 bg-transparent border-0 cursor-pointer">
+                            <svg class="w-4 h-4 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                            </svg>
+                        </button>
+                        {% else %}
+                        <span class="w-4 h-4 inline-block"></span>
+                        {% endif %}
+                        <a href="/zfs/datasets/{{ dataset.name }}" class="text-primary-400 hover:text-primary-300 font-medium transition-colors">
+                            {{ dataset.name.split('/')[-1] }}
+                        </a>
+                    </div>
+                </td>
+                <td class="px-2 py-2 whitespace-nowrap">
+                    {% if dataset.type == 'filesystem' %}
+                        <span class="badge-info text-xs px-2 py-1">FS</span>
+                    {% elif dataset.type == 'volume' %}
+                        <span class="badge-secondary text-xs px-2 py-1">Vol</span>
+                    {% else %}
+                        <span class="badge text-xs px-2 py-1">{{ dataset.type[:3] }}</span>
+                    {% endif %}
+                </td>
+                <td class="px-2 py-2 whitespace-nowrap">
+                    {% if dataset.encryption and dataset.encryption != 'off' and dataset.encryption != '-' %}
+                        <span class="text-success-400" title="{{ dataset.encryption }}">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+                            </svg>
+                        </span>
+                    {% else %}
+                        <span class="text-text-tertiary">-</span>
+                    {% endif %}
+                </td>
+                <td class="px-2 py-2 whitespace-nowrap text-text-primary">{{ dataset.used }}</td>
+                <td class="px-2 py-2 whitespace-nowrap text-text-primary">{{ dataset.avail }}</td>
+                <td class="px-2 py-2 whitespace-nowrap text-text-primary">{{ dataset.refer }}</td>
+                <td class="px-2 py-2 whitespace-nowrap text-text-primary">
+                    {% if dataset.mountpoint == '-' %}
+                        <span class="text-text-tertiary">-</span>
+                    {% elif dataset.mountpoint == 'none' %}
+                        <span class="text-text-tertiary">none</span>
+                    {% else %}
+                        <span class="truncate max-w-[200px] inline-block" title="{{ dataset.mountpoint }}">{{ dataset.mountpoint }}</span>
+                    {% endif %}
+                </td>
+                <td class="px-2 py-2 whitespace-nowrap text-text-primary">{{ dataset.compression }}</td>
+                <td class="px-2 py-2 whitespace-nowrap text-text-primary">{{ dataset.compressratio }}</td>
+                <td class="px-2 py-2 whitespace-nowrap">
+                    <div class="flex items-center gap-1">
+                        <a href="/zfs/datasets/{{ dataset.name }}" 
+                           class="inline-flex text-primary-400 hover:text-primary-300 transition-colors" 
+                           title="View Details">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                            </svg>
+                        </a>
+                        <a href="/zfs/datasets/{{ dataset.name }}/properties" 
+                           class="inline-flex text-success-400 hover:text-success-300 transition-colors" 
+                           title="Properties">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                            </svg>
+                        </a>
+                        {% if dataset.type == 'filesystem' and dataset.mountpoint not in ['-', 'none'] %}
+                        <form method="post" action="/zfs/datasets/{{ dataset.name }}/mount" class="inline-flex">
+                            <button type="submit" 
+                                    class="inline-flex text-purple-400 hover:text-purple-300 transition-colors bg-transparent border-0 p-0 cursor-pointer" 
+                                    title="Mount Dataset">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 19a2 2 0 01-2-2V7a2 2 0 012-2h4l2 2h4a2 2 0 012 2v1M5 19h14a2 2 0 002-2v-5a2 2 0 00-2-2H9a2 2 0 00-2 2v5a2 2 0 01-2 2z"></path>
+                                </svg>
+                            </button>
+                        </form>
+                        <form method="post" action="/zfs/datasets/{{ dataset.name }}/unmount" id="form-unmount-{{ dataset.name.replace('/', '-') }}" class="inline-flex">
+                            <button type="button"
+                                    class="inline-flex text-yellow-400 hover:text-yellow-300 transition-colors bg-transparent border-0 p-0 cursor-pointer" 
+                                    title="Unmount Dataset"
+                                    onclick="showConfirm('confirm-unmount-{{ dataset.name.replace('/', '-') }}')">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 13h6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                </svg>
+                            </button>
+                        </form>
+                        {% else %}
+                        <!-- Placeholder spacers for alignment -->
+                        <span class="w-4 h-4 inline-block"></span>
+                        <span class="w-4 h-4 inline-block"></span>
+                        {% endif %}
+                        <a href="/zfs/datasets/{{ dataset.name }}/rename/form" 
+                           class="inline-flex text-orange-400 hover:text-orange-300 transition-colors" 
+                           title="Rename Dataset">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                            </svg>
+                        </a>
+                    </div>
+                </td>
+            </tr>
+            {# Recursively render children #}
+            {% if dataset.children %}
+                {% for child in dataset.children %}
+                    {{ render_dataset_row(child, depth + 1, row_id) }}
+                {% endfor %}
+            {% endif %}
+            {% endmacro %}
+            
+            <div class="overflow-x-auto">
+                <table class="min-w-full text-sm">
+                    <thead class="bg-bg-elevated-2 text-text-secondary border-b border-border-subtle">
+                        <tr>
+                            <th class="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider">Dataset Name</th>
+                            <th class="px-2 py-2 text-left text-xs font-medium uppercase tracking-wider">Type</th>
+                            <th class="px-2 py-2 text-left text-xs font-medium uppercase tracking-wider">Enc</th>
+                            <th class="px-2 py-2 text-left text-xs font-medium uppercase tracking-wider">Used</th>
+                            <th class="px-2 py-2 text-left text-xs font-medium uppercase tracking-wider">Avail</th>
+                            <th class="px-2 py-2 text-left text-xs font-medium uppercase tracking-wider">Refer</th>
+                            <th class="px-2 py-2 text-left text-xs font-medium uppercase tracking-wider">Mountpoint</th>
+                            <th class="px-2 py-2 text-left text-xs font-medium uppercase tracking-wider">Comp</th>
+                            <th class="px-2 py-2 text-left text-xs font-medium uppercase tracking-wider">Ratio</th>
+                            <th class="px-2 py-2 text-left text-xs font-medium uppercase tracking-wider">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-border-subtle">
+                        {% for dataset in pool_datasets %}
+                            {# Only render top-level datasets (children will be rendered recursively) #}
+                            {% if dataset.depth == 0 %}
+                                {{ render_dataset_row(dataset, 0, '') }}
+                            {% endif %}
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </details>
+        {% endfor %}
+    </div>
+
+    <!-- Dataset Count Summary -->
+    <div class="flex items-center justify-between text-text-secondary text-sm">
+        <p class="flex items-center gap-2">
+            <svg class="w-4 h-4 text-info-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+            </svg>
+            Total Datasets: <span class="font-semibold text-text-primary">{{ datasets|length }}</span>
+        </p>
+    </div>
+    {% else %}
+    <!-- No Datasets Found -->
+    <div class="card text-center py-12">
+        <div class="text-text-tertiary mb-4">
+            <svg class="mx-auto h-16 w-16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>
+            </svg>
+        </div>
+        <h3 class="text-xl font-semibold text-text-primary mb-2">No ZFS Datasets Found</h3>
+        <p class="text-text-secondary mb-6">Create a new dataset to get started.</p>
+        <a href="/zfs/datasets/create/form" class="btn-success inline-flex items-center gap-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+            </svg>
+            Create Dataset
+        </a>
+    </div>
+    {% endif %}
+
+    <!-- Confirmation Modals -->
+    {% if datasets %}
+        {% for dataset in datasets %}
+        {% if dataset.type == 'filesystem' and dataset.mountpoint not in ['-', 'none'] %}
+        {% set id = 'confirm-unmount-' ~ dataset.name.replace('/', '-') %}
+        {% set title = 'Unmount Dataset' %}
+        {% set message = 'Unmount dataset ' ~ dataset.name ~ '? This will make the filesystem inaccessible until remounted.' %}
+        {% set confirm_text = 'Unmount' %}
+        {% set confirm_class = 'warning' %}
+        {% set confirm_action = 'document.getElementById("form-unmount-' ~ dataset.name.replace('/', '-') ~ '").submit()' %}
+        {% include 'partials/confirm.jinja' %}
+        {% endif %}
+        {% endfor %}
+    {% endif %}
+
+    <script>
+    // Ensure showConfirm function is available
+    window.showConfirm = function(dialogId) {
+        const dialog = document.getElementById(dialogId);
+        
+        if (!dialog) {
+            console.error('Dialog not found:', dialogId);
+            return;
+        }
+        
+        // Try using Alpine's global Alpine object if available
+        if (window.Alpine) {
+            // Use Alpine.$data to access the component's data
+            const component = window.Alpine.$data(dialog);
+            if (component) {
+                component.open = true;
+                return;
+            }
+        }
+        
+        // Fallback to __x property
+        if (dialog.__x) {
+            dialog.__x.$data.open = true;
+            return;
+        }
+        
+        // If neither works, try dispatching an event
+        dialog.dispatchEvent(new CustomEvent('open-modal'));
+        console.warn('Could not open modal using Alpine.js, tried dispatching event');
+    };
+    </script>
+
+    <!-- JavaScript for Dataset Collapse/Expand -->
+    <script>
+        function toggleDataset(rowId) {
+            const row = document.getElementById(rowId);
+            const toggle = row.querySelector('.dataset-toggle svg');
+            const childRows = document.querySelectorAll(`tr[data-parent="${rowId}"]`);
+            
+            // Toggle the arrow rotation
+            toggle.classList.toggle('rotate-90');
+            
+            // Toggle visibility of direct children
+            childRows.forEach(childRow => {
+                if (childRow.style.display === 'none') {
+                    childRow.style.display = '';
+                    // If we're showing a row that has children, make sure its children are also visible if it's expanded
+                    const childToggle = childRow.querySelector('.dataset-toggle svg');
+                    if (childToggle && childToggle.classList.contains('rotate-90')) {
+                        const childRowId = childRow.id;
+                        showChildrenRecursively(childRowId);
+                    }
+                } else {
+                    childRow.style.display = 'none';
+                    // When hiding, also hide all descendants
+                    const childRowId = childRow.id;
+                    hideChildrenRecursively(childRowId);
+                }
+            });
+        }
+        
+        function hideChildrenRecursively(rowId) {
+            const childRows = document.querySelectorAll(`tr[data-parent="${rowId}"]`);
+            childRows.forEach(childRow => {
+                childRow.style.display = 'none';
+                hideChildrenRecursively(childRow.id);
+            });
+        }
+        
+        function showChildrenRecursively(rowId) {
+            const childRows = document.querySelectorAll(`tr[data-parent="${rowId}"]`);
+            childRows.forEach(childRow => {
+                childRow.style.display = '';
+                const childToggle = childRow.querySelector('.dataset-toggle svg');
+                if (childToggle && childToggle.classList.contains('rotate-90')) {
+                    showChildrenRecursively(childRow.id);
+                }
+            });
+        }
+    </script>
+
+    <!-- Legend -->
+    <div class="card-nested">
+        <h3 class="text-sm font-semibold text-text-primary mb-3 flex items-center gap-2">
+            <svg class="w-4 h-4 text-info-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            Action Icons
+        </h3>
+        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 text-sm text-text-secondary">
+            <div class="flex items-center gap-2">
+                <svg class="w-4 h-4 text-primary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                </svg>
+                <span>View Details</span>
+            </div>
+            <div class="flex items-center gap-2">
+                <svg class="w-4 h-4 text-success-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                </svg>
+                <span>Properties</span>
+            </div>
+            <div class="flex items-center gap-2">
+                <svg class="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 19a2 2 0 01-2-2V7a2 2 0 012-2h4l2 2h4a2 2 0 012 2v1M5 19h14a2 2 0 002-2v-5a2 2 0 00-2-2H9a2 2 0 00-2 2v5a2 2 0 01-2 2z"></path>
+                </svg>
+                <span>Mount</span>
+            </div>
+            <div class="flex items-center gap-2">
+                <svg class="w-4 h-4 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 13h6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                </svg>
+                <span>Unmount</span>
+            </div>
+            <div class="flex items-center gap-2">
+                <svg class="w-4 h-4 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                </svg>
+                <span>Rename</span>
+            </div>
+        </div>
+        <p class="text-xs text-text-tertiary mt-3">
+            <strong>Note:</strong> Dataset destruction must be performed manually via command line for safety. Mount/unmount actions are only available for filesystems.
+        </p>
+    </div>
+</div>
+{% endblock %}

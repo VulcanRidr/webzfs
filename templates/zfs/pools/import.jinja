@@ -1,0 +1,206 @@
+{% extends "layout.jinja" %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Breadcrumb -->
+    <nav class="flex items-center text-sm text-text-secondary">
+        <a href="/zfs/pools" class="hover:text-text-primary transition-colors">Pools</a>
+        <svg class="w-4 h-4 mx-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+        </svg>
+        <span class="text-text-primary font-medium">Import</span>
+    </nav>
+
+    <!-- Page Header -->
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+            <h1 class="text-3xl font-bold text-text-primary">Import ZFS Pools</h1>
+            <p class="text-text-secondary mt-1">Discover and import available ZFS pools</p>
+        </div>
+        <a href="/zfs/pools" class="btn-secondary inline-flex items-center gap-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+            </svg>
+            Back to Pools
+        </a>
+    </div>
+
+    <!-- Error Messages -->
+    {% if request.query_params.get('error') %}
+        {% with message=request.query_params.get('error') %}
+            {% include "partials/error.jinja" %}
+        {% endwith %}
+    {% endif %}
+
+    {% if error %}
+        {% with message=error %}
+            {% include "partials/error.jinja" %}
+        {% endwith %}
+    {% endif %}
+
+    <!-- Importable Pools -->
+    {% if importable_pools %}
+    <div class="card">
+        <div class="px-6 py-4 bg-bg-elevated-2 border-b border-border-subtle">
+            <p class="text-text-secondary text-sm flex items-center gap-2">
+                <svg class="w-4 h-4 text-success-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                Found <span class="font-semibold text-text-primary">{{ importable_pools|length }}</span> pool(s) available for import
+            </p>
+        </div>
+        <div class="divide-y divide-border-subtle">
+            {% for pool in importable_pools %}
+            <div class="p-6 hover:bg-bg-elevated-2 transition-colors">
+                <div class="flex flex-col lg:flex-row justify-between items-start gap-4">
+                    <div class="flex-1">
+                        <h3 class="text-xl font-semibold text-text-primary mb-3">{{ pool.name }}</h3>
+                        <div class="space-y-2 text-sm">
+                            {% if pool.id %}
+                            <div class="flex items-center gap-2">
+                                <span class="font-medium text-text-secondary w-20">ID:</span>
+                                <span class="font-mono text-text-primary">{{ pool.id }}</span>
+                            </div>
+                            {% endif %}
+                            {% if pool.state %}
+                            <div class="flex items-center gap-2">
+                                <span class="font-medium text-text-secondary w-20">State:</span>
+                                {% if pool.state == 'ONLINE' %}
+                                    <span class="badge-success">{{ pool.state }}</span>
+                                {% else %}
+                                    <span class="badge-warning">{{ pool.state }}</span>
+                                {% endif %}
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="flex flex-col sm:flex-row gap-2 w-full lg:w-auto">
+                        <form method="post" action="/zfs/pools/import/{{ pool.name }}" id="form-import-{{ loop.index }}" style="display: inline;">
+                            <button type="button"
+                                    class="btn-success w-full inline-flex items-center justify-center gap-2"
+                                    onclick="showConfirm('confirm-import-{{ loop.index }}')">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path>
+                                </svg>
+                                Import
+                            </button>
+                        </form>
+                        <form method="post" action="/zfs/pools/import/{{ pool.name }}?force=true" id="form-force-import-{{ loop.index }}" style="display: inline;">
+                            <button type="button"
+                                    class="btn-warning w-full inline-flex items-center justify-center gap-2"
+                                    onclick="showConfirm('confirm-force-import-{{ loop.index }}')">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                                </svg>
+                                Force Import
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% else %}
+    <!-- No Pools to Import -->
+    <div class="card text-center py-12">
+        <div class="text-text-tertiary mb-4">
+            <svg class="mx-auto h-16 w-16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"></path>
+            </svg>
+        </div>
+        <h3 class="text-xl font-semibold text-text-primary mb-2">No Pools Available for Import</h3>
+        <p class="text-text-secondary mb-6">There are currently no ZFS pools available to import on this system.</p>
+        <a href="/zfs/pools" class="text-primary-400 hover:text-primary-300 inline-flex items-center gap-2 transition-colors">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+            </svg>
+            Back to Pools
+        </a>
+    </div>
+    {% endif %}
+
+    <!-- Confirmation Modals -->
+    {% if importable_pools %}
+        {% for pool in importable_pools %}
+        {% set id = 'confirm-import-' ~ loop.index %}
+        {% set title = 'Import Pool' %}
+        {% set message = 'Import pool ' ~ pool.name ~ '? This will mount all its datasets automatically.' %}
+        {% set confirm_text = 'Import Pool' %}
+        {% set confirm_class = 'success' %}
+        {% set confirm_action = 'document.getElementById("form-import-' ~ loop.index ~ '").submit()' %}
+        {% include 'partials/confirm.jinja' %}
+        
+        {% set id = 'confirm-force-import-' ~ loop.index %}
+        {% set title = 'Force Import Pool' %}
+        {% set message = 'Force import pool ' ~ pool.name ~ '? This may be necessary if the pool was not properly exported. Use with caution as this can cause data corruption if the pool is in use elsewhere.' %}
+        {% set confirm_text = 'Force Import' %}
+        {% set confirm_class = 'warning' %}
+        {% set confirm_action = 'document.getElementById("form-force-import-' ~ loop.index ~ '").submit()' %}
+        {% include 'partials/confirm.jinja' %}
+        {% endfor %}
+    {% endif %}
+
+    <script>
+    // Ensure showConfirm function is available
+    window.showConfirm = function(dialogId) {
+        const dialog = document.getElementById(dialogId);
+        
+        if (!dialog) {
+            console.error('Dialog not found:', dialogId);
+            return;
+        }
+        
+        // Try using Alpine's global Alpine object if available
+        if (window.Alpine) {
+            // Use Alpine.$data to access the component's data
+            const component = window.Alpine.$data(dialog);
+            if (component) {
+                component.open = true;
+                return;
+            }
+        }
+        
+        // Fallback to __x property
+        if (dialog.__x) {
+            dialog.__x.$data.open = true;
+            return;
+        }
+        
+        // If neither works, try dispatching an event
+        dialog.dispatchEvent(new CustomEvent('open-modal'));
+        console.warn('Could not open modal using Alpine.js, tried dispatching event');
+    };
+    </script>
+
+    <!-- Info -->
+    <div class="card-nested">
+        <h3 class="text-sm font-semibold text-text-primary mb-3 flex items-center gap-2">
+            <svg class="w-4 h-4 text-info-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            Import Information
+        </h3>
+        <ul class="text-sm text-text-secondary space-y-2">
+            <li class="flex items-start gap-2">
+                <svg class="w-4 h-4 text-success-400 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                <span><strong class="text-text-primary">Import:</strong> Import a pool that was properly exported</span>
+            </li>
+            <li class="flex items-start gap-2">
+                <svg class="w-4 h-4 text-warning-400 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                </svg>
+                <span><strong class="text-text-primary">Force Import:</strong> Import a pool that may not have been properly exported (use with caution)</span>
+            </li>
+            <li class="flex items-start gap-2">
+                <svg class="w-4 h-4 text-info-400 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                <span>Importing a pool will mount all its datasets automatically</span>
+            </li>
+        </ul>
+    </div>
+</div>
+{% endblock %}

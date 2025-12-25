@@ -1,0 +1,254 @@
+{% extends "layout.jinja" %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8 max-w-4xl">
+    <!-- Breadcrumb Navigation -->
+    <nav class="text-sm text-text-secondary mb-4 flex items-center gap-2">
+        <a href="/zfs/pools" class="hover:text-text-primary transition-colors">Pools</a>
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+        </svg>
+        <a href="/zfs/snapshots" class="hover:text-text-primary transition-colors">Snapshots</a>
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+        </svg>
+        <a href="/zfs/snapshots/sanoid" class="hover:text-text-primary transition-colors">Sanoid</a>
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+        </svg>
+        <span class="text-text-primary">Edit Template</span>
+    </nav>
+
+    <!-- Page Header -->
+    <div class="mb-6">
+        <h1 class="text-3xl font-bold text-text-primary">Edit Template: {{ display_name }}</h1>
+        <p class="text-text-secondary mt-2">Modify snapshot retention policy</p>
+    </div>
+
+    <!-- Error Message -->
+    {% if error %}
+    {% include "partials/error.jinja" %}
+    {% endif %}
+
+    <!-- Info Box -->
+    <div class="card-nested bg-info-900/20 border-info-900 mb-6">
+        <div class="flex items-start gap-3">
+            <svg class="w-5 h-5 text-info-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+            <div class="text-sm">
+                <strong class="text-info-400">Info:</strong>
+                <span class="text-text-secondary">Templates define how many snapshots to keep at each interval. Set to 0 to disable that interval.</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Form -->
+    <div class="card">
+        <form method="post" action="/zfs/snapshots/sanoid/template/{{ template_name }}/edit">
+            <!-- Retention Periods -->
+            <div class="card-nested mb-6">
+                <h3 class="text-lg font-semibold text-text-primary mb-4 flex items-center gap-2">
+                    <svg class="w-5 h-5 text-primary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                    Snapshot Retention
+                </h3>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <!-- Frequently -->
+                    <div>
+                        <label for="frequently" class="form-label">
+                            <span class="flex items-center gap-2">
+                                <svg class="w-4 h-4 text-info-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                                </svg>
+                                Frequently (15-min)
+                            </span>
+                        </label>
+                        <input 
+                            type="number" 
+                            id="frequently" 
+                            name="frequently" 
+                            min="0"
+                            value="{{ template_data.get('frequently', 0) }}"
+                            class="form-input"
+                        >
+                        <p class="text-text-tertiary text-xs mt-1">Number of 15-minute snapshots to keep</p>
+                    </div>
+
+                    <!-- Hourly -->
+                    <div>
+                        <label for="hourly" class="form-label">
+                            <span class="flex items-center gap-2">
+                                <svg class="w-4 h-4 text-info-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                </svg>
+                                Hourly
+                            </span>
+                        </label>
+                        <input 
+                            type="number" 
+                            id="hourly" 
+                            name="hourly" 
+                            min="0"
+                            value="{{ template_data.get('hourly', 0) }}"
+                            class="form-input"
+                        >
+                        <p class="text-text-tertiary text-xs mt-1">Number of hourly snapshots to keep</p>
+                    </div>
+
+                    <!-- Daily -->
+                    <div>
+                        <label for="daily" class="form-label">
+                            <span class="flex items-center gap-2">
+                                <svg class="w-4 h-4 text-success-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                                </svg>
+                                Daily
+                            </span>
+                        </label>
+                        <input 
+                            type="number" 
+                            id="daily" 
+                            name="daily" 
+                            min="0"
+                            value="{{ template_data.get('daily', 0) }}"
+                            class="form-input"
+                        >
+                        <p class="text-text-tertiary text-xs mt-1">Number of daily snapshots to keep</p>
+                    </div>
+
+                    <!-- Weekly -->
+                    <div>
+                        <label for="weekly" class="form-label">
+                            <span class="flex items-center gap-2">
+                                <svg class="w-4 h-4 text-warning-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                                </svg>
+                                Weekly
+                            </span>
+                        </label>
+                        <input 
+                            type="number" 
+                            id="weekly" 
+                            name="weekly" 
+                            min="0"
+                            value="{{ template_data.get('weekly', 0) }}"
+                            class="form-input"
+                        >
+                        <p class="text-text-tertiary text-xs mt-1">Number of weekly snapshots to keep</p>
+                    </div>
+
+                    <!-- Monthly -->
+                    <div>
+                        <label for="monthly" class="form-label">
+                            <span class="flex items-center gap-2">
+                                <svg class="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                                </svg>
+                                Monthly
+                            </span>
+                        </label>
+                        <input 
+                            type="number" 
+                            id="monthly" 
+                            name="monthly" 
+                            min="0"
+                            value="{{ template_data.get('monthly', 0) }}"
+                            class="form-input"
+                        >
+                        <p class="text-text-tertiary text-xs mt-1">Number of monthly snapshots to keep</p>
+                    </div>
+
+                    <!-- Yearly -->
+                    <div>
+                        <label for="yearly" class="form-label">
+                            <span class="flex items-center gap-2">
+                                <svg class="w-4 h-4 text-primary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                                </svg>
+                                Yearly
+                            </span>
+                        </label>
+                        <input 
+                            type="number" 
+                            id="yearly" 
+                            name="yearly" 
+                            min="0"
+                            value="{{ template_data.get('yearly', 0) }}"
+                            class="form-input"
+                        >
+                        <p class="text-text-tertiary text-xs mt-1">Number of yearly snapshots to keep</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Advanced Options -->
+            <div class="card-nested mb-6">
+                <h3 class="text-lg font-semibold text-text-primary mb-4 flex items-center gap-2">
+                    <svg class="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                    </svg>
+                    Advanced Options
+                </h3>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <!-- Auto-snap -->
+                    <div>
+                        <label for="autosnap" class="form-label">
+                            Auto-Snapshot
+                        </label>
+                        <select 
+                            id="autosnap" 
+                            name="autosnap"
+                            class="form-select"
+                        >
+                            <option value="yes" {% if template_data.get('autosnap', 'yes') == 'yes' %}selected{% endif %}>Yes - Automatically create snapshots</option>
+                            <option value="no" {% if template_data.get('autosnap', 'yes') == 'no' %}selected{% endif %}>No - Manual only</option>
+                        </select>
+                    </div>
+
+                    <!-- Auto-prune -->
+                    <div>
+                        <label for="autoprune" class="form-label">
+                            Auto-Prune
+                        </label>
+                        <select 
+                            id="autoprune" 
+                            name="autoprune"
+                            class="form-select"
+                        >
+                            <option value="yes" {% if template_data.get('autoprune', 'yes') == 'yes' %}selected{% endif %}>Yes - Automatically prune old snapshots</option>
+                            <option value="no" {% if template_data.get('autoprune', 'yes') == 'no' %}selected{% endif %}>No - Keep all snapshots</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="flex gap-4">
+                <button 
+                    type="submit"
+                    class="btn-primary flex items-center gap-2"
+                >
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                    </svg>
+                    Save Changes
+                </button>
+                <a 
+                    href="/zfs/snapshots/sanoid" 
+                    class="btn-secondary flex items-center gap-2"
+                >
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                    Cancel
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

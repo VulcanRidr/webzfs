@@ -1,0 +1,102 @@
+{# Navigation bar with modern dark theme #}
+<nav class="nav-primary sticky top-0 z-50 bg-bg-elevated border-b border-border-subtle shadow-lg">
+  <div class="container-page">
+    <div class="flex items-center justify-between h-16">
+      
+      {# Logo and Branding #}
+      <div class="flex items-center space-x-3 flex-shrink-0">
+        <div class="flex items-center justify-center w-11 h-11 bg-primary-900/50 rounded-lg border border-primary-500/30 transition-transform duration-200 hover:scale-105">
+          <svg
+            fill="currentColor"
+            class="w-6 h-6 text-primary-400"
+            viewBox="0 0 1920 1920"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path
+              d="M1556.611 1920c-54.084 0-108.168-20.692-149.333-61.857L740.095 1190.96c-198.162 41.712-406.725-19.269-550.475-163.019C14.449 852.771-35.256 582.788 65.796 356.27l32.406-72.696 390.194 390.193c24.414 24.305 64.266 24.305 88.68 0l110.687-110.686c11.824-11.934 18.283-27.59 18.283-44.34 0-16.751-6.46-32.516-18.283-44.34L297.569 84.207 370.265 51.8C596.893-49.252 866.875.453 1041.937 175.515c155.026 155.136 212.833 385.157 151.851 594.815l650.651 650.651c39.961 39.852 61.967 92.95 61.967 149.443 0 56.383-22.006 109.482-61.967 149.334l-138.275 138.385c-41.275 41.165-95.36 61.857-149.553 61.857Z"
+              fill-rule="evenodd"
+            />
+          </svg>
+        </div>
+        <span class="text-xl font-semibold text-text-primary tracking-tight">
+          {{ settings.CAPTION }}
+        </span>
+      </div>
+
+      {# Navigation Tabs - Desktop #}
+      <div class="hidden lg:flex flex-1 justify-center px-8">
+        <ul class="flex items-center space-x-2">
+          {% for tab in NAV_TABS %}
+            <li>
+              <a
+                class="nav-tab {% if tab.id == 'dashboard' %}text-primary-400 border-primary-500{% elif tab.id == 'fleet' %}text-purple-400 border-purple-500{% elif active_page == tab.id %}nav-tab-active{% endif %}"
+                href="{{ tab.url }}"
+              >
+                {{ tab.label }}
+              </a>
+            </li>
+          {% endfor %}
+        </ul>
+      </div>
+
+      {# User Actions #}
+      <div class="flex items-center space-x-3 flex-shrink-0">
+        <form action="/login/logout" method="post" class="m-0">
+          <button 
+            class="px-4 py-2 rounded-lg text-danger-400 border border-danger-500/30 hover:bg-danger-500/10 hover:border-danger-500/50 hover:text-danger-300 transition-all duration-200 group flex items-center"
+            type="submit"
+            title="Log out"
+          >
+            <svg class="w-5 h-5 mr-2 transition-transform duration-200 group-hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
+            </svg>
+            <span class="hidden sm:inline">Log out</span>
+          </button>
+        </form>
+
+        {# Mobile Menu Button #}
+        <button 
+          id="mobile-menu-button"
+          class="lg:hidden btn-ghost p-2"
+          type="button"
+          aria-label="Toggle menu"
+          onclick="toggleMobileMenu()"
+        >
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path id="menu-icon-open" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+            <path id="menu-icon-close" class="hidden" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    {# Mobile Menu #}
+    <div id="mobile-menu" class="hidden lg:hidden pb-4 pt-2 border-t border-border-subtle mt-2">
+      <ul class="space-y-1">
+        {% for tab in NAV_TABS %}
+          <li>
+            <a
+              class="block px-4 py-2.5 rounded-lg transition-colors duration-200 {% if tab.id == 'dashboard' %}text-primary-400 {% if active_page == tab.id %}bg-bg-elevated-3 font-medium border-l-4 border-primary-500{% else %}hover:text-primary-300 hover:bg-bg-elevated-2{% endif %}{% elif tab.id == 'fleet' %}text-purple-400 {% if active_page == tab.id %}bg-bg-elevated-3 font-medium border-l-4 border-purple-500{% else %}hover:text-purple-300 hover:bg-bg-elevated-2{% endif %}{% elif active_page == tab.id %}bg-bg-elevated-3 text-primary-400 font-medium border-l-4 border-primary-500{% else %}text-text-secondary hover:text-text-primary hover:bg-bg-elevated-2{% endif %}"
+              href="{{ tab.url }}"
+            >
+              {{ tab.label }}
+            </a>
+          </li>
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+</nav>
+
+{# Mobile Menu Toggle Script #}
+<script>
+  function toggleMobileMenu() {
+    const menu = document.getElementById('mobile-menu');
+    const iconOpen = document.getElementById('menu-icon-open');
+    const iconClose = document.getElementById('menu-icon-close');
+    
+    menu.classList.toggle('hidden');
+    iconOpen.classList.toggle('hidden');
+    iconClose.classList.toggle('hidden');
+  }
+</script>

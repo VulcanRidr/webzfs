@@ -1,0 +1,15 @@
+{% extends "base.jinja" %}
+
+{% block body %}
+    {% include "partials/navbar.jinja" %}
+    <main class="min-h-screen">
+        <div id="error" class="container-page py-4">
+            {% if error %}
+                {% include "partials/error.jinja" %}
+            {% endif %}
+        </div>
+        <div class="container-page py-page">
+            {% block content %}{% endblock %}
+        </div>
+    </main>
+{% endblock %}

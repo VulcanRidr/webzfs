@@ -1,0 +1,1709 @@
+{% extends "layout.jinja" %}
+
+{% block content %}
+<div class="space-y-8">
+    <!-- Breadcrumb -->
+    <nav class="flex items-center text-sm text-text-secondary mb-8">
+        <a href="/zfs/pools" class="hover:text-text-primary transition-colors">Pools</a>
+        <svg class="w-4 h-4 mx-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+        </svg>
+        <span class="text-text-primary font-medium">Create Pool</span>
+    </nav>
+
+    <!-- Page Header -->
+    <div class="mb-8">
+        <h1 class="text-3xl font-bold text-text-primary mb-2">Create New ZFS Pool</h1>
+        <p class="text-text-secondary text-sm">Drag disks to configure your pool topology</p>
+    </div>
+
+    <!-- Error Message -->
+    {% if error %}
+        <div class="bg-danger-900/20 border-2 border-danger-500 rounded-xl p-4">
+            <div class="flex items-start gap-3">
+                <svg class="w-5 h-5 text-danger-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                <p class="text-sm text-text-primary">{{ error }}</p>
+            </div>
+        </div>
+    {% endif %}
+
+    <!-- Main Layout: Topology Builder (Left) + Available Disks (Right) -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        
+        <!-- LEFT SIDE: Pool Topology Builder -->
+        <div class="space-y-6">
+            
+            <!-- Pool Name Card -->
+            <div class="card">
+                <div class="card-body p-4">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h2 class="text-lg font-semibold text-text-primary mb-1">Pool Configuration</h2>
+                            <p class="text-xs text-text-tertiary">Set the name for your new ZFS pool</p>
+                        </div>
+                    </div>
+                    <div class="mt-4">
+                        <label for="pool_name_header" class="form-label">Pool Name</label>
+                        <input 
+                            type="text" 
+                            id="pool_name_header" 
+                            placeholder="mypool"
+                            pattern="[a-zA-Z0-9_\-]+"
+                            class="form-input"
+                            value="{{ pool_name if pool_name else '' }}">
+                        <p class="mt-1.5 text-xs text-text-tertiary">Use alphanumeric characters, dashes, and underscores only</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Topology Configuration Card -->
+            <div class="card">
+                <div class="card-body p-4 space-y-6">
+                    <div class="flex items-center justify-between">
+                        <h2 class="text-xl font-semibold text-text-primary">Pool Topology</h2>
+                        <span class="text-xs text-text-tertiary bg-bg-elevated px-3 py-1.5 rounded">Total: <span id="total-capacity">0 TB</span></span>
+                    </div>
+
+                    <!-- Data VDEVs Section -->
+                    <div class="space-y-4">
+                        <!-- Data Header -->
+                        <div class="flex items-center justify-between gap-4">
+                            <div class="flex items-center gap-3">
+                                <div class="w-1 h-6 bg-primary-400 rounded-full"></div>
+                                <h3 class="text-lg font-semibold text-text-primary">Data VDEVs</h3>
+                                <span id="data-capacity" class="text-xs text-primary-400 font-mono">0 TB</span>
+                            </div>
+                            <div class="flex items-center gap-3">
+                                <select id="vdev_type" class="form-select text-sm py-1.5 min-w-[140px]">
+                                    <option value="single">Single Disk</option>
+                                    <option value="mirror" selected>Mirror</option>
+                                    <option value="raidz">RAID-Z</option>
+                                    <option value="raidz2">RAID-Z2</option>
+                                    <option value="raidz3">RAID-Z3</option>
+                                </select>
+                                <button type="button" onclick="addVdev()" class="btn-primary text-sm py-1.5 px-3">
+                                    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                                    </svg>
+                                    Add VDEV
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Data VDEVs Container -->
+                        <div id="vdevs-container" class="space-y-4">
+                            <!-- VDEVs will be added here dynamically -->
+                        </div>
+
+                        <!-- Empty State -->
+                        <div id="vdevs-empty" 
+                             class="min-h-[200px] border-2 border-dashed border-border-subtle rounded-xl p-4 flex flex-col items-center justify-center text-text-tertiary transition-all empty-state-disabled">
+                            <svg class="w-12 h-12 mb-3 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                            </svg>
+                            <p class="text-sm font-medium mb-2 opacity-60">No VDEVs created yet</p>
+                            <p class="text-xs opacity-60">Click "Add VDEV" to create your first data vdev</p>
+                        </div>
+
+                        <!-- Optional VDEVs - Add Button Menu -->
+                        <div class="pt-6">
+                            <div class="flex items-center gap-3 mb-4">
+                                <h3 class="text-lg font-semibold text-text-primary">Optional Special VDEVs</h3>
+                            </div>
+                            <div class="flex flex-wrap gap-2">
+                                <button type="button" onclick="toggleSection('spare')" id="btn-spare" class="btn-secondary text-sm">
+                                    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                                    </svg>
+                                    Add Spare
+                                </button>
+                                <button type="button" onclick="toggleSection('cache')" id="btn-cache" class="btn-secondary text-sm">
+                                    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                                    </svg>
+                                    Add Cache (L2ARC)
+                                </button>
+                                <button type="button" onclick="toggleSection('log')" id="btn-log" class="btn-secondary text-sm">
+                                    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                                    </svg>
+                                    Add Log (SLOG)
+                                </button>
+                                <button type="button" onclick="toggleSection('metadata')" id="btn-metadata" class="btn-secondary text-sm">
+                                    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                                    </svg>
+                                    Add Metadata
+                                </button>
+                                <button type="button" onclick="toggleSection('dedup')" id="btn-dedup" class="btn-secondary text-sm">
+                                    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                                    </svg>
+                                    Add Dedup
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Spare VDEVs Section (Hidden by default) -->
+                        <div id="section-spare" class="pt-6 hidden">
+                            <div class="flex items-center justify-between mb-4">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-1 h-6 bg-warning-400 rounded-full"></div>
+                                    <h3 class="text-lg font-semibold text-text-primary">Spare</h3>
+                                    <span class="text-xs text-text-tertiary">(Hot spares - not mirrored)</span>
+                                </div>
+                                <button type="button" onclick="closeSection('spare')" class="text-text-tertiary hover:text-danger-400 transition-colors">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                    </svg>
+                                </button>
+                            </div>
+                            <div id="spare-dropzone" 
+                                 class="min-h-[100px] bg-bg-base border-2 border-dashed border-border-subtle rounded-xl p-4 transition-all hover:border-warning-400/50"
+                                 ondrop="dropDisk(event, 'spare')" 
+                                 ondragover="allowDrop(event)"
+                                 ondragleave="dragLeave(event)">
+                                <div id="spare-disks" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                                    <!-- Spare disks will be added here -->
+                                </div>
+                                <div id="spare-empty" class="flex items-center justify-center py-6 text-text-tertiary text-xs">
+                                    Drag disks here for hot spares
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Cache VDEVs Section (Hidden by default) -->
+                        <div id="section-cache" class="pt-6 hidden">
+                            <div class="flex items-center justify-between mb-4">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-1 h-6 bg-success-400 rounded-full"></div>
+                                    <h3 class="text-lg font-semibold text-text-primary">Cache (L2ARC)</h3>
+                                    <span class="text-xs text-text-tertiary">(Striped - not mirrored)</span>
+                                </div>
+                                <button type="button" onclick="closeSection('cache')" class="text-text-tertiary hover:text-danger-400 transition-colors">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                    </svg>
+                                </button>
+                            </div>
+                            <div id="cache-dropzone" 
+                                 class="min-h-[100px] bg-bg-base border-2 border-dashed border-border-subtle rounded-xl p-4 transition-all hover:border-success-400/50"
+                                 ondrop="dropDisk(event, 'cache')" 
+                                 ondragover="allowDrop(event)"
+                                 ondragleave="dragLeave(event)">
+                                <div id="cache-disks" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                                    <!-- Cache disks will be added here -->
+                                </div>
+                                <div id="cache-empty" class="flex items-center justify-center py-6 text-text-tertiary text-xs">
+                                    Drag SSDs here for L2ARC cache (will be striped)
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Log VDEVs Section (Hidden by default) -->
+                        <div id="section-log" class="pt-6 hidden">
+                            <div class="flex items-center justify-between mb-4">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-1 h-6 bg-info-400 rounded-full"></div>
+                                    <h3 class="text-lg font-semibold text-text-primary">Log (SLOG)</h3>
+                                    <span class="text-xs text-text-tertiary">(Can be mirrored)</span>
+                                </div>
+                                <button type="button" onclick="closeSection('log')" class="text-text-tertiary hover:text-danger-400 transition-colors">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                    </svg>
+                                </button>
+                            </div>
+                            <div id="log-dropzone" 
+                                 class="min-h-[100px] bg-bg-base border-2 border-dashed border-border-subtle rounded-xl p-4 transition-all hover:border-info-400/50"
+                                 ondrop="dropDisk(event, 'log')" 
+                                 ondragover="allowDrop(event)"
+                                 ondragleave="dragLeave(event)">
+                                <div id="log-disks" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                                    <!-- Log disks will be added here -->
+                                </div>
+                                <div id="log-empty" class="flex items-center justify-center py-6 text-text-tertiary text-xs">
+                                    Drag SSDs here for SLOG (can be mirrored for redundancy)
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Metadata VDEVs Section (Hidden by default) -->
+                        <div id="section-metadata" class="pt-6 hidden">
+                            <div class="flex items-center justify-between mb-4">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-1 h-6 bg-purple-400 rounded-full"></div>
+                                    <h3 class="text-lg font-semibold text-text-primary">Metadata</h3>
+                                    <span class="text-xs text-text-tertiary">(Must be mirrored - depth matches data redundancy)</span>
+                                </div>
+                                <button type="button" onclick="closeSection('metadata')" class="text-text-tertiary hover:text-danger-400 transition-colors">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                    </svg>
+                                </button>
+                            </div>
+                            <div id="metadata-container" class="space-y-4">
+                                <!-- Metadata mirrors will be added here -->
+                            </div>
+                            <button type="button" onclick="addMetadataMirror()" class="btn-secondary text-sm mt-3">
+                                <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                                </svg>
+                                Add Metadata Mirror
+                            </button>
+                        </div>
+
+                        <!-- Dedup VDEVs Section (Hidden by default) -->
+                        <div id="section-dedup" class="pt-6 hidden">
+                            <div class="flex items-center justify-between mb-4">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-1 h-6 bg-pink-400 rounded-full"></div>
+                                    <h3 class="text-lg font-semibold text-text-primary">Dedup</h3>
+                                    <span class="text-xs text-text-tertiary">(Deduplication table)</span>
+                                </div>
+                                <button type="button" onclick="closeSection('dedup')" class="text-text-tertiary hover:text-danger-400 transition-colors">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                    </svg>
+                                </button>
+                            </div>
+                            <div id="dedup-dropzone" 
+                                 class="min-h-[100px] bg-bg-base border-2 border-dashed border-border-subtle rounded-xl p-4 transition-all hover:border-pink-400/50"
+                                 ondrop="dropDisk(event, 'dedup')" 
+                                 ondragover="allowDrop(event)"
+                                 ondragleave="dragLeave(event)">
+                                <div id="dedup-disks" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                                    <!-- Dedup disks will be added here -->
+                                </div>
+                                <div id="dedup-empty" class="flex items-center justify-center py-6 text-text-tertiary text-xs">
+                                    Drag SSDs here for deduplication table
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Command Preview Card -->
+            <div class="card border-2 border-info-500/30 bg-bg-elevated">
+                <div class="card-body p-4 space-y-3">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-3">
+                            <div class="w-8 h-8 rounded-lg bg-info-500/20 flex items-center justify-center">
+                                <svg class="w-5 h-5 text-info-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                                </svg>
+                            </div>
+                            <div>
+                                <h2 class="text-lg font-semibold text-text-primary">Command Preview</h2>
+                                <p class="text-xs text-text-tertiary">The zpool command that will be executed</p>
+                            </div>
+                        </div>
+                        <button type="button" 
+                                onclick="copyCommandToClipboard()"
+                                class="btn-secondary text-sm py-1.5 px-3 inline-flex items-center gap-2"
+                                title="Copy to clipboard">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                            </svg>
+                            Copy
+                        </button>
+                    </div>
+                    
+                    <div class="bg-bg-base border border-border-subtle rounded-lg p-4 font-mono text-sm">
+                        <div id="command-preview" class="text-text-primary whitespace-pre-wrap break-all leading-relaxed">
+                            <span class="text-text-tertiary italic">Configure your pool to see the command...</span>
+                        </div>
+                    </div>
+                    
+                    <div class="flex items-start gap-2 text-xs text-info-400 bg-info-900/20 rounded-lg p-3">
+                        <svg class="w-4 h-4 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        <p>This preview shows the exact <code class="bg-bg-base px-1 py-0.5 rounded">zpool create</code> command that will be executed. The command updates in real-time as you modify your pool configuration.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Advanced Options Card -->
+            <div class="card">
+                <div class="card-body p-4 space-y-4">
+                    <h2 class="text-lg font-semibold text-text-primary">Advanced Options</h2>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <!-- AShift -->
+                        <div>
+                            <label for="ashift" class="form-label text-sm">Sector Size (ashift)</label>
+                            <select id="ashift" name="ashift" class="form-select">
+                                <option value="">Auto (Recommended)</option>
+                                <option value="9">9 (512-byte sectors)</option>
+                                <option value="12" selected>12 (4K sectors)</option>
+                                <option value="13">13 (8K sectors)</option>
+                            </select>
+                        </div>
+
+                        <!-- Force Creation -->
+                        <div class="flex items-center gap-3">
+                            <input type="checkbox" id="force" name="force" class="form-checkbox">
+                            <label for="force" class="text-sm text-text-primary cursor-pointer">
+                                Force creation if devices in use
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="flex justify-between items-center pt-2">
+                <a href="/zfs/pools" class="btn-secondary">
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
+                    </svg>
+                    Cancel
+                </a>
+                <div class="flex gap-3">
+                    <button type="button" onclick="resetTopology()" class="btn-secondary">
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                        </svg>
+                        Reset
+                    </button>
+                    <button type="button" onclick="validateAndCreate()" class="btn-success">
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                        </svg>
+                        Create Pool
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- RIGHT SIDE: Available Disks -->
+        <div>
+            <div class="card sticky top-6">
+                <div class="card-body p-4 space-y-4">
+                    <div class="flex items-center justify-between mb-2">
+                        <h2 class="text-xl font-semibold text-text-primary">Available Disks</h2>
+                        <div class="flex flex-col items-end gap-1">
+                            <button type="button" 
+                                    onclick="showConfirm('confirm-check-disks')" 
+                                    class="btn-warning text-sm py-2 px-3 inline-flex items-center gap-2">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                </svg>
+                                Detect Disks in Use
+                            </button>
+                            <span class="text-xs text-text-tertiary italic">(Linux Only)</span>
+                        </div>
+                    </div>
+
+                    <!-- Disk Status Legend -->
+                    <div class="mb-4 p-3 bg-bg-elevated rounded-lg border border-border-subtle">
+                        <h3 class="text-xs font-semibold text-text-primary mb-2 uppercase tracking-wider">Disk Status</h3>
+                        <div class="space-y-2 text-xs">
+                            <div class="flex items-center gap-2">
+                                <div class="w-5 h-5 rounded border-2 flex-shrink-0" style="border-color: #dc2626; background-color: rgba(153, 27, 27, 0.5);"></div>
+                                <span class="text-text-secondary"><strong>OS/System Disk</strong> - CANNOT be used (contains OS/swap)</span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <div class="w-5 h-5 rounded border-2 flex-shrink-0" style="border-color: #f87171; background-color: rgba(153, 27, 27, 0.3);"></div>
+                                <span class="text-text-secondary">In Active Pool - Cannot be used</span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <div class="w-5 h-5 rounded border-2 flex-shrink-0" style="border-color: #fbbf24; background-color: rgba(120, 53, 15, 0.3);"></div>
+                                <span class="text-text-secondary">Has ZFS Label - Use with caution</span>
+                            </div>
+                        </div>
+                        <div class="mt-3 pt-3 border-t border-border-subtle">
+                            <p class="text-xs text-danger-400 flex items-start gap-1 mb-2">
+                                <svg class="w-4 h-4 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                                </svg>
+                                <span><strong>CRITICAL:</strong> OS/System disks are automatically blocked to prevent accidental system destruction!</span>
+                            </p>
+                            <p class="text-xs text-warning-400 flex items-start gap-1">
+                                <svg class="w-4 h-4 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                                </svg>
+                                <span>To clear ZFS label: <code class="bg-bg-base px-1 py-0.5 rounded text-xs font-mono">sudo zpool labelclear -f /dev/sdX</code></span>
+                            </p>
+                            <p class="text-xs text-danger-400 mt-2 flex items-start gap-1">
+                                <span class="flex-shrink-0">⚠️</span>
+                                <span>WARNING: Clearing labels may cause data loss if the disk is part of another pool!</span>
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="space-y-8">
+                        <!-- Hard Drives -->
+                        {% if hdds %}
+                        <div>
+                            <div class="flex items-center gap-2 mb-4 pb-2 border-b border-border-subtle">
+                                <div class="w-6 h-6 rounded-lg bg-bg-elevated flex items-center justify-center">
+                                    <svg class="w-4 h-4 text-text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4"></path>
+                                    </svg>
+                                </div>
+                                <div>
+                                    <h3 class="text-sm font-semibold text-text-primary">Hard Drives</h3>
+                                    <p class="text-xs text-text-tertiary">{{ hdds|length }} available</p>
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                                {% for disk in hdds %}
+                                <div id="avail-{{ disk.name }}" 
+                                     draggable="{% if disk.is_system_disk %}false{% else %}true{% endif %}" 
+                                     ondragstart="dragStart(event, '{{ disk.device_path }}', '{{ disk.name }}', '{{ disk.size }}', '{{ disk.type }}')"
+                                     ondragend="dragEnd(event)"
+                                     class="disk-card group relative bg-bg-elevated border-2 border-border-default rounded-lg p-3 transition-all {% if disk.in_use or disk.is_system_disk %}opacity-50 cursor-not-allowed{% else %}cursor-grab active:cursor-grabbing hover:border-primary-400 hover:shadow-lg{% endif %}"
+                                     data-device="{{ disk.device_path }}"
+                                     data-name="{{ disk.name }}"
+                                     data-size="{{ disk.size }}"
+                                     data-type="{{ disk.type }}"
+                                     data-is-system="{{ 'true' if disk.is_system_disk else 'false' }}"
+                                     data-system-usage="{{ disk.system_usage if disk.system_usage else '' }}"
+                                     data-status="{% if disk.is_system_disk %}system{% else %}available{% endif %}">
+                                    
+                                    <div class="flex items-start gap-3">
+                                        <!-- Disk Icon -->
+                                        <div class="flex-shrink-0">
+                                            <div class="w-10 h-10 rounded-xl bg-bg-base flex items-center justify-center group-hover:bg-bg-elevated transition-colors">
+                                                <svg class="w-6 h-6 text-text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"></path>
+                                                </svg>
+                                            </div>
+                                            <div class="mt-1 text-center">
+                                                <div class="text-sm font-bold text-primary-400 font-mono">{{ disk.size }}</div>
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- Disk Info -->
+                                        <div class="flex-1 min-w-0">
+                                            <div class="flex items-start justify-between gap-1 mb-1">
+                                                <div>
+                                                    <div class="text-sm font-mono font-semibold text-text-primary">{{ disk.name }}</div>
+                                                    <div class="text-xs text-text-tertiary mt-0.5">{{ disk.device_path|replace('/dev/', '') }}</div>
+                                                </div>
+                                            </div>
+                                            <div class="text-xs text-text-secondary mt-2">
+                                                {{ disk.model if disk.model and disk.model != 'Unknown' else 'Hard Disk Drive' }}
+                                            </div>
+                                            {% if disk.is_system_disk %}
+                                            <div class="mt-2 inline-flex items-center gap-1 px-2 py-1 rounded-md bg-danger-900/80 text-danger-300 text-xs font-semibold border border-danger-500">
+                                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+                                                </svg>
+                                                {{ disk.system_usage }}
+                                            </div>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        {% endif %}
+
+                        <!-- Solid State Drives -->
+                        {% if ssds %}
+                        <div>
+                            <div class="flex items-center gap-3 mb-6 pb-2 border-b border-border-subtle">
+                                <div class="w-8 h-8 rounded-lg bg-bg-elevated flex items-center justify-center">
+                                    <svg class="w-5 h-5 text-text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                                    </svg>
+                                </div>
+                                <div>
+                                    <h3 class="text-base font-semibold text-text-primary">Solid State Drives</h3>
+                                    <p class="text-xs text-text-tertiary">{{ ssds|length }} available</p>
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                                {% for disk in ssds %}
+                                <div id="avail-{{ disk.name }}" 
+                                     draggable="{% if disk.is_system_disk %}false{% else %}true{% endif %}" 
+                                     ondragstart="dragStart(event, '{{ disk.device_path }}', '{{ disk.name }}', '{{ disk.size }}', '{{ disk.type }}')"
+                                     ondragend="dragEnd(event)"
+                                     class="disk-card group relative bg-bg-elevated border-2 border-border-default rounded-lg p-4 transition-all {% if disk.in_use or disk.is_system_disk %}opacity-50 cursor-not-allowed{% else %}cursor-grab active:cursor-grabbing hover:border-primary-400 hover:shadow-lg{% endif %}"
+                                     data-device="{{ disk.device_path }}"
+                                     data-name="{{ disk.name }}"
+                                     data-size="{{ disk.size }}"
+                                     data-type="{{ disk.type }}"
+                                     data-is-system="{{ 'true' if disk.is_system_disk else 'false' }}"
+                                     data-system-usage="{{ disk.system_usage if disk.system_usage else '' }}"
+                                     data-status="{% if disk.is_system_disk %}system{% else %}available{% endif %}">
+                                    
+                                    <div class="flex items-start gap-4">
+                                        <!-- Disk Icon -->
+                                        <div class="flex-shrink-0">
+                                            <div class="w-14 h-14 rounded-xl bg-bg-base flex items-center justify-center group-hover:bg-bg-elevated transition-colors">
+                                                <svg class="w-8 h-8 text-primary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                                                </svg>
+                                            </div>
+                                            <div class="mt-2 text-center">
+                                                <div class="text-lg font-bold text-primary-400 font-mono">{{ disk.size }}</div>
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- Disk Info -->
+                                        <div class="flex-1 min-w-0">
+                                            <div class="flex items-start justify-between gap-2 mb-1">
+                                                <div>
+                                                    <div class="text-sm font-mono font-semibold text-text-primary">{{ disk.name }}</div>
+                                                    <div class="text-xs text-text-tertiary mt-0.5">{{ disk.device_path|replace('/dev/', '') }}</div>
+                                                </div>
+                                            </div>
+                                            <div class="text-xs text-text-secondary mt-2">
+                                                {{ disk.model if disk.model and disk.model != 'Unknown' else 'Solid State Drive' }}
+                                            </div>
+                                            {% if disk.is_system_disk %}
+                                            <div class="mt-2 inline-flex items-center gap-1 px-2 py-1 rounded-md bg-danger-900/80 text-danger-300 text-xs font-semibold border border-danger-500">
+                                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+                                                </svg>
+                                                {{ disk.system_usage }}
+                                            </div>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        {% endif %}
+
+                        {% if not hdds and not ssds %}
+                        <div class="text-center py-12 text-text-tertiary">
+                            <svg class="w-12 h-12 mx-auto mb-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"></path>
+                            </svg>
+                            <p class="text-sm">No disks available</p>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Hidden Form for Submission -->
+<form id="create-pool-form" method="post" action="/zfs/pools/create" style="display: none;">
+    <input type="hidden" name="pool_name" id="form_pool_name">
+    <input type="hidden" name="vdev_type" id="form_vdev_type">
+    <input type="hidden" name="devices" id="form_devices">
+    <input type="hidden" name="spare_devices" id="form_spare_devices">
+    <input type="hidden" name="cache_devices" id="form_cache_devices">
+    <input type="hidden" name="log_devices" id="form_log_devices">
+    <input type="hidden" name="metadata_devices" id="form_metadata_devices">
+    <input type="hidden" name="dedup_devices" id="form_dedup_devices">
+    <input type="hidden" name="force" id="form_force" value="false">
+    <input type="hidden" name="ashift" id="form_ashift">
+</form>
+
+<!-- Confirmation Modal for Disk Check -->
+{% set id = 'confirm-check-disks' %}
+{% set title = 'Check for In-Use Disks' %}
+{% set message = 'This will check all disks for active pool usage and ZFS labels. Using disks that are in active pools or have ZFS labels may result in DATA LOSS if not handled carefully.<br><br><strong>Note:</strong> This automated check is not perfect. As an administrator, you should independently verify that disks are not in use before adding them to a pool.' %}
+{% set confirm_text = 'Check Disks' %}
+{% set confirm_class = 'warning' %}
+{% set confirm_action = 'runDiskCheck()' %}
+{% include 'partials/confirm.jinja' %}
+
+<!-- Confirmation Modal for Pool Creation -->
+{% set id = 'confirm-create-pool' %}
+{% set title = 'Create ZFS Pool' %}
+{% set message = 'Are you sure you want to create this pool? This will DESTROY ALL DATA on the specified devices! This operation cannot be undone.' %}
+{% set confirm_text = 'Create Pool' %}
+{% set confirm_class = 'danger' %}
+{% set confirm_action = 'document.getElementById("create-pool-form").submit()' %}
+{% include 'partials/confirm.jinja' %}
+
+<style>
+.disk-item {
+    @apply bg-bg-elevated-2 border-2 border-border-default rounded-lg p-2 transition-all;
+}
+
+.disk-item:not(.opacity-50):hover {
+    @apply border-primary-400 shadow-lg;
+}
+
+.disk-in-topology {
+    @apply bg-bg-elevated-2 border-2 border-border-strong rounded-lg p-2 relative;
+}
+
+[ondragover] {
+    transition: all 0.2s ease;
+}
+
+[ondragover].drag-over {
+    @apply border-primary-400 bg-primary-900/10;
+}
+
+/* Empty state with diagonal stripes */
+.empty-state-disabled {
+    background-color: #1a1a1a;
+    background-image: repeating-linear-gradient(
+        45deg,
+        transparent,
+        transparent 10px,
+        rgba(128, 128, 128, 0.15) 10px,
+        rgba(128, 128, 128, 0.15) 20px
+    );
+    opacity: 0.7;
+    position: relative;
+}
+
+.empty-state-disabled::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 0.75rem;
+    pointer-events: none;
+}
+
+.empty-state-disabled > * {
+    position: relative;
+    z-index: 1;
+}
+
+/* Disk status indicators */
+.disk-card[data-status="system"] {
+    border-color: #dc2626 !important; /* danger-600 - darker red for system disks */
+    background-color: rgba(153, 27, 27, 0.4) !important; /* danger-900/40 - more prominent */
+    cursor: not-allowed !important;
+    opacity: 0.6;
+}
+
+.disk-card[data-status="active"] {
+    border-color: #f87171 !important; /* danger-400 */
+    background-color: rgba(153, 27, 27, 0.2) !important; /* danger-900/20 */
+    cursor: not-allowed !important;
+    opacity: 0.7;
+}
+
+.disk-card[data-status="labeled"] {
+    border-color: #fbbf24 !important; /* warning-400 */
+    background-color: rgba(120, 53, 15, 0.2) !important; /* warning-900/20 */
+}
+
+.disk-card[data-status="available"] {
+    /* Default styling - no special indicator needed */
+}
+
+.disk-card[data-status="system"]:hover,
+.disk-card[data-status="active"]:hover,
+.disk-card[data-status="labeled"]:hover {
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
+}
+</style>
+
+<script>
+// State management
+var draggedDisk = null;
+var vdevCounter = 0;
+var metadataCounter = 0;
+var dataVdevs = [];  // Array of vdevs, each with: { id, type, disks: [] }
+var metadataMirrors = []; // Array of metadata mirrors
+var poolDisks = {
+    spare: [],
+    cache: [],
+    log: [],
+    dedup: []
+};
+
+// Show section (only opens, doesn't toggle)
+function toggleSection(sectionName) {
+    const section = document.getElementById(`section-${sectionName}`);
+    const button = document.getElementById(`btn-${sectionName}`);
+    
+    // Only open if hidden, don't toggle off
+    if (section.classList.contains('hidden')) {
+        section.classList.remove('hidden');
+        button.classList.add('opacity-50');
+        button.disabled = true;  // Disable button once opened
+        
+        // Auto-create first metadata mirror when section is shown
+        if (sectionName === 'metadata' && metadataMirrors.length === 0) {
+            addMetadataMirror();
+        }
+    }
+}
+
+// Close section (used by the X button in each section)
+function closeSection(sectionName) {
+    const section = document.getElementById(`section-${sectionName}`);
+    const button = document.getElementById(`btn-${sectionName}`);
+    
+    section.classList.add('hidden');
+    button.classList.remove('opacity-50');
+    button.disabled = false;  // Re-enable the add button
+    
+    // Clear disks when hiding
+    if (sectionName === 'spare' || sectionName === 'cache' || sectionName === 'log' || sectionName === 'dedup') {
+        poolDisks[sectionName].forEach(disk => {
+            const availDisk = document.getElementById(`avail-${disk.name}`);
+            if (availDisk) {
+                availDisk.style.display = 'block';
+                availDisk.style.opacity = '1';
+            }
+        });
+        poolDisks[sectionName] = [];
+        renderTopology();
+    } else if (sectionName === 'metadata') {
+        metadataMirrors.forEach(mirror => {
+            mirror.disks.forEach(disk => {
+                const availDisk = document.getElementById(`avail-${disk.name}`);
+                if (availDisk) {
+                    availDisk.style.display = 'block';
+                    availDisk.style.opacity = '1';
+                }
+            });
+        });
+        metadataMirrors = [];
+        renderMetadataMirrors();
+    }
+}
+
+// Add metadata mirror
+function addMetadataMirror() {
+    const mirrorId = metadataCounter++;
+    metadataMirrors.push({
+        id: mirrorId,
+        disks: []
+    });
+    renderMetadataMirrors();
+}
+
+// Remove metadata mirror
+function removeMetadataMirror(mirrorId) {
+    const mirrorIndex = metadataMirrors.findIndex(m => m.id === mirrorId);
+    if (mirrorIndex === -1) return;
+    
+    const mirror = metadataMirrors[mirrorIndex];
+    
+    // Return all disks to available list
+    mirror.disks.forEach(disk => {
+        const availDisk = document.getElementById(`avail-${disk.name}`);
+        if (availDisk) {
+            availDisk.style.display = 'block';
+            availDisk.style.opacity = '1';
+        }
+    });
+    
+    metadataMirrors.splice(mirrorIndex, 1);
+    renderMetadataMirrors();
+}
+
+// Render metadata mirrors
+function renderMetadataMirrors() {
+    const container = document.getElementById('metadata-container');
+    
+    if (metadataMirrors.length === 0) {
+        container.innerHTML = '<div class="text-center py-8 text-text-tertiary text-sm">No metadata mirrors. Click "Add Metadata Mirror" to create one.</div>';
+        updateCommandPreview();
+        return;
+    }
+    
+    container.innerHTML = metadataMirrors.map((mirror, displayIndex) => {
+        const disksHtml = mirror.disks.map((disk, diskIndex) => `
+            <div class="disk-in-topology group">
+                <button type="button" 
+                        onclick="removeDiskFromMetadataMirror(${mirror.id}, ${diskIndex})"
+                        class="absolute -top-2 -right-2 w-5 h-5 bg-danger-500 hover:bg-danger-400 rounded-full flex items-center justify-center transition-all z-10 shadow-lg">
+                    <svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+                <div class="flex items-center gap-2">
+                    <div class="flex-shrink-0 w-8 h-8 bg-bg-base rounded-lg flex items-center justify-center">
+                        ${disk.type === 'SSD' ? 
+                            '<svg class="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>' :
+                            '<svg class="w-5 h-5 text-text-tertiary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4"></path></svg>'
+                        }
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <div class="text-xs font-mono text-text-primary font-semibold">${disk.name}</div>
+                        <div class="text-xs text-purple-400 font-mono">${disk.size}</div>
+                    </div>
+                </div>
+            </div>
+        `).join('');
+        
+        const emptyState = mirror.disks.length === 0 ? `
+            <div class="flex flex-col items-center justify-center py-8 text-text-tertiary">
+                <svg class="w-10 h-10 mb-2 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                </svg>
+                <p class="text-xs">Drag SSDs here (must match data redundancy level)</p>
+            </div>
+        ` : '';
+        
+        return `
+            <div class="mb-4">
+                <div class="flex items-center justify-between mb-2">
+                    <div class="flex items-center gap-2">
+                        <span class="text-sm font-semibold text-text-primary">Metadata Mirror ${displayIndex + 1}</span>
+                        <span class="text-xs text-purple-400 font-mono">${mirror.disks.length} disk(s)</span>
+                    </div>
+                    <button type="button" 
+                            onclick="removeMetadataMirror(${mirror.id})"
+                            class="text-danger-400 hover:text-danger-300 transition-colors">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                        </svg>
+                    </button>
+                </div>
+                <div id="metadata-${mirror.id}-dropzone" 
+                     class="min-h-[100px] bg-bg-base border-2 border-dashed border-border-subtle rounded-xl p-4 transition-all hover:border-purple-400/50"
+                     ondrop="dropDiskToMetadataMirror(event, ${mirror.id})" 
+                     ondragover="allowDrop(event)"
+                     ondragleave="dragLeave(event)">
+                    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                        ${disksHtml}
+                    </div>
+                    ${emptyState}
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+// Drop disk to metadata mirror
+function dropDiskToMetadataMirror(event, mirrorId) {
+    event.preventDefault();
+    event.currentTarget.classList.remove('drag-over');
+    
+    if (!draggedDisk) return;
+    
+    const mirror = metadataMirrors.find(m => m.id === mirrorId);
+    if (!mirror) return;
+    
+    mirror.disks.push(draggedDisk);
+    
+    // Hide from available list
+    const availDisk = document.getElementById(`avail-${draggedDisk.name}`);
+    if (availDisk) {
+        availDisk.style.display = 'none';
+    }
+    
+    draggedDisk = null;
+    renderMetadataMirrors();
+}
+
+// Remove disk from metadata mirror
+function removeDiskFromMetadataMirror(mirrorId, diskIndex) {
+    const mirror = metadataMirrors.find(m => m.id === mirrorId);
+    if (!mirror) return;
+    
+    const disk = mirror.disks[diskIndex];
+    mirror.disks.splice(diskIndex, 1);
+    
+    const availDisk = document.getElementById(`avail-${disk.name}`);
+    if (availDisk) {
+        availDisk.style.display = 'block';
+        availDisk.style.opacity = '1';
+    }
+    
+    renderMetadataMirrors();
+}
+
+// Add a new vdev
+function addVdev() {
+    const vdevType = document.getElementById('vdev_type').value;
+    const vdevId = vdevCounter++;
+    
+    dataVdevs.push({
+        id: vdevId,
+        type: vdevType,
+        disks: []
+    });
+    
+    renderVdevs();
+    updateCapacities();
+}
+
+// Remove a vdev
+function removeVdev(vdevId) {
+    const vdevIndex = dataVdevs.findIndex(v => v.id === vdevId);
+    if (vdevIndex === -1) return;
+    
+    const vdev = dataVdevs[vdevIndex];
+    
+    // Return all disks to available list
+    vdev.disks.forEach(disk => {
+        const availDisk = document.getElementById(`avail-${disk.name}`);
+        if (availDisk) {
+            availDisk.style.display = 'block';
+            availDisk.style.opacity = '1';
+        }
+    });
+    
+    dataVdevs.splice(vdevIndex, 1);
+    renderVdevs();
+    updateCapacities();
+}
+
+// Render all vdevs
+function renderVdevs() {
+    const container = document.getElementById('vdevs-container');
+    const empty = document.getElementById('vdevs-empty');
+    
+    if (dataVdevs.length === 0) {
+        empty.style.display = 'flex';
+        container.innerHTML = '';
+        return;
+    }
+    
+    empty.style.display = 'none';
+    container.innerHTML = dataVdevs.map(vdev => {
+        const disksHtml = vdev.disks.map((disk, diskIndex) => `
+            <div class="disk-in-topology group">
+                <button type="button" 
+                        onclick="removeDiskFromVdev(${vdev.id}, ${diskIndex})"
+                        class="absolute -top-2 -right-2 w-5 h-5 bg-danger-500 hover:bg-danger-400 rounded-full flex items-center justify-center transition-all z-10 shadow-lg">
+                    <svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+                <div class="flex items-center gap-2">
+                    <div class="flex-shrink-0 w-8 h-8 bg-bg-base rounded-lg flex items-center justify-center">
+                        ${disk.type === 'SSD' ? 
+                            '<svg class="w-5 h-5 text-primary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>' :
+                            '<svg class="w-5 h-5 text-text-tertiary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4"></path></svg>'
+                        }
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <div class="text-xs font-mono text-text-primary font-semibold">${disk.name}</div>
+                        <div class="text-xs text-primary-400 font-mono">${disk.size}</div>
+                    </div>
+                </div>
+            </div>
+        `).join('');
+        
+        const emptyState = vdev.disks.length === 0 ? `
+            <div class="flex flex-col items-center justify-center py-8 text-text-tertiary pointer-events-none">
+                <svg class="w-10 h-10 mb-2 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                </svg>
+                <p class="text-xs">Drag disks here</p>
+            </div>
+        ` : '';
+        
+        return `
+            <div class="bg-bg-elevated border-2 border-border-default rounded-xl p-4">
+                <div class="flex items-center justify-between mb-3">
+                    <div class="flex items-center gap-2">
+                        <span class="text-sm font-semibold text-text-primary">VDEV ${vdev.id + 1}</span>
+                        <span class="text-xs text-text-tertiary bg-bg-base px-2 py-1 rounded">${vdev.type.toUpperCase()}</span>
+                        <span class="text-xs text-primary-400 font-mono">${formatCapacity(calculateVdevCapacity(vdev))}</span>
+                    </div>
+                    <button type="button" 
+                            onclick="removeVdev(${vdev.id})"
+                            class="text-danger-400 hover:text-danger-300 transition-colors">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                        </svg>
+                    </button>
+                </div>
+                <div id="vdev-${vdev.id}-dropzone" 
+                     class="min-h-[120px] bg-bg-base border-2 border-dashed border-border-subtle rounded-lg p-3 transition-all hover:border-primary-400/50"
+                     ondrop="dropDiskToVdev(event, ${vdev.id})" 
+                     ondragover="allowDrop(event)"
+                     ondragleave="dragLeave(event)">
+                    <div class="grid grid-cols-2 md:grid-cols-3 gap-2">
+                        ${disksHtml}
+                    </div>
+                    ${emptyState}
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+// Calculate capacity for a single vdev
+function calculateVdevCapacity(vdev) {
+    let totalSize = 0;
+    
+    vdev.disks.forEach(disk => {
+        const sizeStr = disk.size;
+        const match = sizeStr.match(/(\d+\.?\d*)\s*([TGMK]?B?)/i);
+        if (match) {
+            let size = parseFloat(match[1]);
+            const unit = match[2].toUpperCase();
+            
+            if (unit.startsWith('G')) size = size / 1000;
+            else if (unit.startsWith('M')) size = size / 1000000;
+            else if (unit.startsWith('K')) size = size / 1000000000;
+            
+            totalSize += size;
+        }
+    });
+    
+    const diskCount = vdev.disks.length;
+    if (diskCount === 0) return 0;
+    
+    if (vdev.type === 'single') return totalSize;
+    if (vdev.type === 'mirror') return totalSize / diskCount;
+    if (vdev.type === 'raidz') return totalSize * ((diskCount - 1) / diskCount);
+    if (vdev.type === 'raidz2') return totalSize * ((diskCount - 2) / diskCount);
+    if (vdev.type === 'raidz3') return totalSize * ((diskCount - 3) / diskCount);
+    
+    return totalSize;
+}
+
+// Drag and drop handlers
+function dragStart(event, device, name, size, type) {
+    // Check if the disk is a system disk
+    const diskCard = event.target;
+    const isSystemDisk = diskCard.dataset.isSystem === 'true';
+    
+    if (isSystemDisk) {
+        event.preventDefault();
+        const systemUsage = diskCard.dataset.systemUsage || 'OS/System disk';
+        alert(`Cannot use system disk!\n\nThis disk is marked as: ${systemUsage}\n\nUsing this disk would destroy your operating system!`);
+        return false;
+    }
+    
+    draggedDisk = { device, name, size, type };
+    event.dataTransfer.effectAllowed = 'move';
+    event.target.style.opacity = '0.5';
+}
+
+function dragEnd(event) {
+    event.target.style.opacity = '1';
+}
+
+function allowDrop(event) {
+    event.preventDefault();
+    event.currentTarget.classList.add('drag-over');
+}
+
+function dragLeave(event) {
+    event.currentTarget.classList.remove('drag-over');
+}
+
+function dropDiskToVdev(event, vdevId) {
+    event.preventDefault();
+    event.currentTarget.classList.remove('drag-over');
+    
+    if (!draggedDisk) return;
+    
+    const vdev = dataVdevs.find(v => v.id === vdevId);
+    if (!vdev) return;
+    
+    vdev.disks.push(draggedDisk);
+    
+    // Hide from available list
+    const availDisk = document.getElementById(`avail-${draggedDisk.name}`);
+    if (availDisk) {
+        availDisk.style.display = 'none';
+    }
+    
+    draggedDisk = null;
+    renderVdevs();
+    updateCapacities();
+}
+
+function dropDiskToEmptyState(event) {
+    event.preventDefault();
+    event.currentTarget.classList.remove('drag-over');
+    
+    if (!draggedDisk) return;
+    
+    // Auto-create first vdev with selected type
+    const vdevType = document.getElementById('vdev_type').value;
+    const vdevId = vdevCounter++;
+    
+    const newVdev = {
+        id: vdevId,
+        type: vdevType,
+        disks: [draggedDisk]
+    };
+    
+    dataVdevs.push(newVdev);
+    
+    // Hide from available list
+    const availDisk = document.getElementById(`avail-${draggedDisk.name}`);
+    if (availDisk) {
+        availDisk.style.display = 'none';
+    }
+    
+    draggedDisk = null;
+    renderVdevs();
+    updateCapacities();
+}
+
+function dropDisk(event, targetZone) {
+    event.preventDefault();
+    event.currentTarget.classList.remove('drag-over');
+    
+    if (!draggedDisk) return;
+    
+    poolDisks[targetZone].push(draggedDisk);
+    
+    const availDisk = document.getElementById(`avail-${draggedDisk.name}`);
+    if (availDisk) {
+        availDisk.style.display = 'none';
+    }
+    
+    renderTopology();
+    draggedDisk = null;
+}
+
+function removeDiskFromVdev(vdevId, diskIndex) {
+    const vdev = dataVdevs.find(v => v.id === vdevId);
+    if (!vdev) return;
+    
+    const disk = vdev.disks[diskIndex];
+    vdev.disks.splice(diskIndex, 1);
+    
+    const availDisk = document.getElementById(`avail-${disk.name}`);
+    if (availDisk) {
+        availDisk.style.display = 'block';
+        availDisk.style.opacity = '1';
+    }
+    
+    renderVdevs();
+    updateCapacities();
+}
+
+function renderTopology() {
+    ['spare', 'cache', 'log', 'dedup'].forEach(zone => {
+        const container = document.getElementById(`${zone}-disks`);
+        const empty = document.getElementById(`${zone}-empty`);
+        
+        if (poolDisks[zone].length === 0) {
+            container.innerHTML = '';
+            if (empty) empty.style.display = 'flex';
+        } else {
+            if (empty) empty.style.display = 'none';
+            container.innerHTML = poolDisks[zone].map((disk, index) => `
+                <div class="disk-in-topology group">
+                    <button type="button" 
+                            onclick="removeDisk('${zone}', ${index})"
+                            class="absolute -top-2 -right-2 w-5 h-5 bg-danger-500 hover:bg-danger-400 rounded-full flex items-center justify-center transition-all z-10 shadow-lg">
+                        <svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                    <div class="flex items-center gap-2">
+                        <div class="flex-shrink-0 w-8 h-8 bg-bg-base rounded-lg flex items-center justify-center">
+                            ${disk.type === 'SSD' ? 
+                                '<svg class="w-5 h-5 text-primary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>' :
+                                '<svg class="w-5 h-5 text-text-tertiary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4"></path></svg>'
+                            }
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <div class="text-xs font-mono text-text-primary font-semibold">${disk.name}</div>
+                            <div class="text-xs text-primary-400 font-mono">${disk.size}</div>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+    });
+    
+    // Update command preview whenever special VDEVs change
+    updateCommandPreview();
+}
+
+function removeDisk(zone, index) {
+    const disk = poolDisks[zone][index];
+    poolDisks[zone].splice(index, 1);
+    
+    const availDisk = document.getElementById(`avail-${disk.name}`);
+    if (availDisk) {
+        availDisk.style.display = 'block';
+        availDisk.style.opacity = '1';
+    }
+    
+    renderTopology();
+}
+
+function resetTopology() {
+    dataVdevs = [];
+    vdevCounter = 0;
+    metadataCounter = 0;
+    metadataMirrors = [];
+    poolDisks = {
+        spare: [],
+        cache: [],
+        log: [],
+        dedup: []
+    };
+    
+    document.querySelectorAll('[id^="avail-"]').forEach(disk => {
+        disk.style.display = 'block';
+        disk.style.opacity = '1';
+    });
+    
+    renderVdevs();
+    renderTopology();
+    updateCapacities();
+}
+
+// Format capacity with appropriate unit (GB or TB)
+function formatCapacity(sizeInTB) {
+    if (sizeInTB < 1) {
+        // Convert to GB for values less than 1 TB
+        const sizeInGB = sizeInTB * 1000;
+        return sizeInGB.toFixed(2) + ' GB';
+    }
+    return sizeInTB.toFixed(2) + ' TB';
+}
+
+function updateCapacities() {
+    // Calculate total pool capacity (sum of all vdev capacities)
+    const totalCapacity = dataVdevs.reduce((sum, vdev) => sum + calculateVdevCapacity(vdev), 0);
+    
+    document.getElementById('data-capacity').textContent = formatCapacity(totalCapacity);
+    document.getElementById('total-capacity').textContent = formatCapacity(totalCapacity);
+    
+    // Update command preview whenever capacities change
+    updateCommandPreview();
+}
+
+// Generate and update the zpool command preview
+function updateCommandPreview() {
+    const previewEl = document.getElementById('command-preview');
+    const poolName = document.getElementById('pool_name_header').value.trim();
+    
+    // If no pool name or no vdevs, show placeholder
+    if (!poolName || dataVdevs.length === 0) {
+        previewEl.innerHTML = '<span class="text-text-tertiary italic">Configure your pool to see the command...</span>';
+        return;
+    }
+    
+    // Start building the command
+    let cmd = ['zpool', 'create'];
+    
+    // Add force flag if checked
+    if (document.getElementById('force').checked) {
+        cmd.push('-f');
+    }
+    
+    // Add ashift option if selected
+    const ashift = document.getElementById('ashift').value;
+    if (ashift) {
+        cmd.push('-o', `ashift=${ashift}`);
+    }
+    
+    // Add pool name
+    cmd.push(poolName);
+    
+    // Add data vdevs
+    dataVdevs.forEach(vdev => {
+        // Add vdev type (except for single disk)
+        if (vdev.type !== 'single') {
+            cmd.push(vdev.type);
+        }
+        
+        // Add disk devices
+        vdev.disks.forEach(disk => {
+            cmd.push(disk.device);
+        });
+    });
+    
+    // Add spare devices
+    if (poolDisks.spare.length > 0) {
+        cmd.push('spare');
+        poolDisks.spare.forEach(disk => {
+            cmd.push(disk.device);
+        });
+    }
+    
+    // Add cache devices
+    if (poolDisks.cache.length > 0) {
+        cmd.push('cache');
+        poolDisks.cache.forEach(disk => {
+            cmd.push(disk.device);
+        });
+    }
+    
+    // Add log devices
+    if (poolDisks.log.length > 0) {
+        cmd.push('log');
+        // Check if we have multiple log devices (mirrored SLOG)
+        if (poolDisks.log.length > 1) {
+            cmd.push('mirror');
+        }
+        poolDisks.log.forEach(disk => {
+            cmd.push(disk.device);
+        });
+    }
+    
+    // Add metadata special vdevs
+    if (metadataMirrors.length > 0) {
+        metadataMirrors.forEach(mirror => {
+            if (mirror.disks.length > 0) {
+                cmd.push('special');
+                if (mirror.disks.length > 1) {
+                    cmd.push('mirror');
+                }
+                mirror.disks.forEach(disk => {
+                    cmd.push(disk.device);
+                });
+            }
+        });
+    }
+    
+    // Add dedup devices
+    if (poolDisks.dedup.length > 0) {
+        cmd.push('dedup');
+        // Dedup can be mirrored too
+        if (poolDisks.dedup.length > 1) {
+            cmd.push('mirror');
+        }
+        poolDisks.dedup.forEach(disk => {
+            cmd.push(disk.device);
+        });
+    }
+    
+    // Format the command with syntax highlighting
+    const formattedCmd = formatCommand(cmd);
+    previewEl.innerHTML = formattedCmd;
+}
+
+// Format command with syntax highlighting
+function formatCommand(cmdArray) {
+    let formatted = '';
+    let indent = 0;
+    const baseIndent = '  ';
+    
+    for (let i = 0; i < cmdArray.length; i++) {
+        const part = cmdArray[i];
+        
+        // Check if this is a vdev type keyword
+        const vdevTypes = ['mirror', 'raidz', 'raidz2', 'raidz3', 'spare', 'cache', 'log', 'special', 'dedup'];
+        const isVdevType = vdevTypes.includes(part);
+        const isOption = part.startsWith('-');
+        const isDevice = part.startsWith('/dev/');
+        
+        // Add line breaks and indentation for readability
+        if (i > 0) {
+            if (isVdevType) {
+                formatted += ' \\\n' + baseIndent;
+                indent = 1;
+            } else if (isDevice && indent > 0) {
+                formatted += ' \\\n' + baseIndent + baseIndent;
+            } else {
+                formatted += ' ';
+            }
+        }
+        
+        // Apply color coding
+        if (i === 0) {
+            // Command name (zpool)
+            formatted += `<span class="text-success-400">${part}</span>`;
+        } else if (i === 1) {
+            // Subcommand (create)
+            formatted += `<span class="text-info-400">${part}</span>`;
+        } else if (isOption) {
+            // Options (-f, -o)
+            formatted += `<span class="text-warning-400">${part}</span>`;
+        } else if (part.includes('=')) {
+            // Property assignments (ashift=12)
+            const [key, value] = part.split('=');
+            formatted += `<span class="text-purple-400">${key}</span>=<span class="text-text-primary">${value}</span>`;
+        } else if (isVdevType) {
+            // VDEV types
+            formatted += `<span class="text-primary-400 font-semibold">${part}</span>`;
+        } else if (isDevice) {
+            // Device paths
+            formatted += `<span class="text-text-primary">${part}</span>`;
+        } else {
+            // Pool name
+            formatted += `<span class="text-success-300 font-semibold">${part}</span>`;
+        }
+    }
+    
+    return formatted;
+}
+
+// Copy command to clipboard
+function copyCommandToClipboard() {
+    const poolName = document.getElementById('pool_name_header').value.trim();
+    
+    if (!poolName || dataVdevs.length === 0) {
+        alert('Please configure your pool first');
+        return;
+    }
+    
+    // Build plain text command
+    let cmd = ['zpool', 'create'];
+    
+    if (document.getElementById('force').checked) {
+        cmd.push('-f');
+    }
+    
+    const ashift = document.getElementById('ashift').value;
+    if (ashift) {
+        cmd.push('-o', `ashift=${ashift}`);
+    }
+    
+    cmd.push(poolName);
+    
+    dataVdevs.forEach(vdev => {
+        if (vdev.type !== 'single') {
+            cmd.push(vdev.type);
+        }
+        vdev.disks.forEach(disk => {
+            cmd.push(disk.device);
+        });
+    });
+    
+    if (poolDisks.spare.length > 0) {
+        cmd.push('spare');
+        poolDisks.spare.forEach(disk => cmd.push(disk.device));
+    }
+    
+    if (poolDisks.cache.length > 0) {
+        cmd.push('cache');
+        poolDisks.cache.forEach(disk => cmd.push(disk.device));
+    }
+    
+    if (poolDisks.log.length > 0) {
+        cmd.push('log');
+        if (poolDisks.log.length > 1) {
+            cmd.push('mirror');
+        }
+        poolDisks.log.forEach(disk => cmd.push(disk.device));
+    }
+    
+    if (metadataMirrors.length > 0) {
+        metadataMirrors.forEach(mirror => {
+            if (mirror.disks.length > 0) {
+                cmd.push('special');
+                if (mirror.disks.length > 1) {
+                    cmd.push('mirror');
+                }
+                mirror.disks.forEach(disk => cmd.push(disk.device));
+            }
+        });
+    }
+    
+    if (poolDisks.dedup.length > 0) {
+        cmd.push('dedup');
+        if (poolDisks.dedup.length > 1) {
+            cmd.push('mirror');
+        }
+        poolDisks.dedup.forEach(disk => cmd.push(disk.device));
+    }
+    
+    const cmdString = cmd.join(' ');
+    
+    // Copy to clipboard
+    navigator.clipboard.writeText(cmdString).then(() => {
+        // Show temporary success feedback
+        const btn = event.target.closest('button');
+        const originalHTML = btn.innerHTML;
+        btn.innerHTML = `
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+            </svg>
+            Copied!
+        `;
+        btn.classList.add('btn-success');
+        btn.classList.remove('btn-secondary');
+        
+        setTimeout(() => {
+            btn.innerHTML = originalHTML;
+            btn.classList.remove('btn-success');
+            btn.classList.add('btn-secondary');
+        }, 2000);
+    }).catch(err => {
+        console.error('Failed to copy:', err);
+        alert('Failed to copy command to clipboard');
+    });
+}
+
+function validateAndCreate() {
+    const poolName = document.getElementById('pool_name_header').value.trim();
+    if (!poolName) {
+        alert('Please enter a pool name');
+        document.getElementById('pool_name_header').focus();
+        return;
+    }
+    
+    if (!/^[a-zA-Z0-9_-]+$/.test(poolName)) {
+        alert('Pool name can only contain alphanumeric characters, dashes, and underscores');
+        document.getElementById('pool_name_header').focus();
+        return;
+    }
+    
+    if (dataVdevs.length === 0) {
+        alert('Please add at least one vdev');
+        return;
+    }
+    
+    // Validate each vdev
+    for (const vdev of dataVdevs) {
+        const diskCount = vdev.disks.length;
+        
+        if (diskCount === 0) {
+            alert(`VDEV ${vdev.id + 1} has no disks. Please add disks or remove the vdev.`);
+            return;
+        }
+        
+        if (vdev.type === 'mirror' && diskCount < 2) {
+            alert(`VDEV ${vdev.id + 1}: Mirror requires at least 2 disks`);
+            return;
+        }
+        if (vdev.type === 'raidz' && diskCount < 3) {
+            alert(`VDEV ${vdev.id + 1}: RAID-Z requires at least 3 disks`);
+            return;
+        }
+        if (vdev.type === 'raidz2' && diskCount < 4) {
+            alert(`VDEV ${vdev.id + 1}: RAID-Z2 requires at least 4 disks`);
+            return;
+        }
+        if (vdev.type === 'raidz3' && diskCount < 5) {
+            alert(`VDEV ${vdev.id + 1}: RAID-Z3 requires at least 5 disks`);
+            return;
+        }
+    }
+    
+    // Populate form - need to format for multiple vdevs
+    document.getElementById('form_pool_name').value = poolName;
+    document.getElementById('form_vdev_type').value = dataVdevs[0].type; // Use first vdev type as default
+    
+    // Build devices list - format: vdev1disk1,vdev1disk2 vdev2disk1,vdev2disk2
+    const vdevDevices = dataVdevs.map(vdev => 
+        vdev.disks.map(d => d.device).join(',')
+    ).join(' ');
+    document.getElementById('form_devices').value = vdevDevices;
+    
+    // Populate special VDEV fields
+    document.getElementById('form_spare_devices').value = poolDisks.spare.map(d => d.device).join(',');
+    document.getElementById('form_cache_devices').value = poolDisks.cache.map(d => d.device).join(',');
+    document.getElementById('form_log_devices').value = poolDisks.log.map(d => d.device).join(',');
+    
+    // Format metadata devices - multiple mirrors separated by space, disks within a mirror separated by comma
+    const metadataDevices = metadataMirrors
+        .filter(m => m.disks.length > 0)
+        .map(m => m.disks.map(d => d.device).join(','))
+        .join(' ');
+    document.getElementById('form_metadata_devices').value = metadataDevices;
+    
+    document.getElementById('form_dedup_devices').value = poolDisks.dedup.map(d => d.device).join(',');
+    
+    document.getElementById('form_force').value = document.getElementById('force').checked ? 'true' : 'false';
+    document.getElementById('form_ashift').value = document.getElementById('ashift').value;
+    
+    showConfirm('confirm-create-pool');
+}
+
+// Run disk check (called after user confirms)
+async function runDiskCheck() {
+    try {
+        const response = await fetch('/zfs/pools/create/check-disk-usage');
+        const data = await response.json();
+        
+        if (data.success && data.disk_status) {
+            // Update disk status indicators
+            Object.entries(data.disk_status).forEach(([devicePath, status]) => {
+                // Find disk element by device path
+                const diskElements = document.querySelectorAll('.disk-card');
+                diskElements.forEach(diskEl => {
+                    if (diskEl.dataset.device === devicePath) {
+                        // Update status attribute
+                        diskEl.dataset.status = status.status;
+                        
+                        // Disable dragging for active pool disks
+                        if (status.in_active_pool) {
+                            diskEl.draggable = false;
+                            diskEl.classList.add('opacity-50', 'cursor-not-allowed');
+                            diskEl.classList.remove('cursor-grab', 'active:cursor-grabbing');
+                            
+                            // Add badge after model name if pool name is known
+                            if (status.pool_name) {
+                                const diskInfo = diskEl.querySelector('.flex-1.min-w-0');
+                                if (diskInfo) {
+                                    const badge = document.createElement('div');
+                                    badge.className = 'inline-flex items-center gap-1 px-2 py-1 rounded-md bg-danger-900/80 text-danger-300 text-xs font-medium mt-2';
+                                    badge.innerHTML = `
+                                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+                                        </svg>
+                                        ${status.pool_name}
+                                    `;
+                                    diskInfo.appendChild(badge);
+                                }
+                            }
+                        } else if (status.has_zfs_label) {
+                            // Add warning badge after model name for labeled disks
+                            const diskInfo = diskEl.querySelector('.flex-1.min-w-0');
+                            if (diskInfo) {
+                                const badge = document.createElement('div');
+                                badge.className = 'inline-flex items-center gap-1 px-2 py-1 rounded-md bg-warning-900/80 text-warning-300 text-xs font-medium mt-2';
+                                badge.innerHTML = `
+                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                                    </svg>
+                                    ${status.pool_name || 'Label'}
+                                `;
+                                diskInfo.appendChild(badge);
+                            }
+                        }
+                    }
+                });
+            });
+        }
+    } catch (error) {
+        console.error('Error checking disk usage:', error);
+        alert('Error checking disk usage. Please try again.');
+    }
+}
+
+// Ensure showConfirm function is available
+window.showConfirm = function(dialogId) {
+    const dialog = document.getElementById(dialogId);
+    
+    if (!dialog) {
+        console.error('Dialog not found:', dialogId);
+        return;
+    }
+    
+    // Try using Alpine's global Alpine object if available
+    if (window.Alpine) {
+        // Use Alpine.$data to access the component's data
+        const component = window.Alpine.$data(dialog);
+        if (component) {
+            component.open = true;
+            return;
+        }
+    }
+    
+    // Fallback to __x property
+    if (dialog.__x) {
+        dialog.__x.$data.open = true;
+        return;
+    }
+    
+    // If neither works, try dispatching an event
+    dialog.dispatchEvent(new CustomEvent('open-modal'));
+    console.warn('Could not open modal using Alpine.js, tried dispatching event');
+};
+
+// Initialize - run immediately since script is at bottom of page
+(function() {
+    renderVdevs();
+    renderTopology();
+    renderMetadataMirrors();
+    updateCapacities();
+    
+    // Add event listeners for command preview updates
+    document.getElementById('pool_name_header').addEventListener('input', updateCommandPreview);
+    document.getElementById('ashift').addEventListener('change', updateCommandPreview);
+    document.getElementById('force').addEventListener('change', updateCommandPreview);
+})();
+</script>
+
+{% endblock %}

@@ -1,0 +1,11 @@
+{% extends "layout_main.jinja" %}
+
+{% set active_page = "files" %}
+
+{% block caption %}Edit File{% endblock %}
+
+{% block inner %}
+    <div id="edit">
+        {% include "utils/files/edit_form.jinja" %}
+    </div>
+{% endblock %}

@@ -1,0 +1,220 @@
+{% extends "layout_main.jinja" %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block content %}
+<div class="container-custom">
+    <div class="flex items-center space-x-3 mb-6">
+        <a href="/zfs/replication/history" class="text-text-secondary hover:text-text-primary">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+            </svg>
+        </a>
+        <h1 class="heading-1">Email Notification Settings</h1>
+    </div>
+
+    {% if error %}
+    <div class="alert-error">
+        {{ error }}
+    </div>
+    {% endif %}
+
+    {% if request.args.get('message') %}
+    <div class="alert-success">
+        {{ request.args.get('message') }}
+    </div>
+    {% endif %}
+
+    <!-- Configuration Status -->
+    <div class="card mb-6">
+        <div class="card-header">
+            <h2 class="heading-2">Configuration Status</h2>
+            {% if is_configured %}
+                <span class="badge-success">Configured</span>
+            {% else %}
+                <span class="badge-warning">Not Configured</span>
+            {% endif %}
+        </div>
+        <div class="card-content">
+            {% if is_configured %}
+            <div class="flex items-start space-x-3 p-4 bg-success-900/20 border border-success-500/30 rounded">
+                <svg class="w-5 h-5 text-success-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+                <div class="flex-1">
+                    <h3 class="font-medium text-success-400 mb-1">Email notifications are enabled</h3>
+                    <p class="text-sm text-text-secondary">
+                        The system will send email notifications when replication jobs fail.
+                    </p>
+                </div>
+            </div>
+            {% else %}
+            <div class="flex items-start space-x-3 p-4 bg-warning-900/20 border border-warning-500/30 rounded">
+                <svg class="w-5 h-5 text-warning-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                </svg>
+                <div class="flex-1">
+                    <h3 class="font-medium text-warning-400 mb-1">Email notifications are not configured</h3>
+                    <p class="text-sm text-text-secondary">
+                        Configure SMTP settings in the .env file to enable email notifications for failed replication jobs.
+                    </p>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Current Settings -->
+    <div class="card mb-6">
+        <div class="card-header">
+            <h2 class="heading-2">Current Settings</h2>
+        </div>
+        <div class="card-content">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <div class="text-sm text-text-tertiary mb-1">SMTP Enabled</div>
+                    <div class="font-medium">
+                        {% if smtp_enabled %}
+                            <span class="text-success-400">Yes</span>
+                        {% else %}
+                            <span class="text-error-400">No</span>
+                        {% endif %}
+                    </div>
+                </div>
+                <div>
+                    <div class="text-sm text-text-tertiary mb-1">SMTP Host</div>
+                    <div class="font-mono text-sm">{{ smtp_host or 'Not configured' }}</div>
+                </div>
+                <div>
+                    <div class="text-sm text-text-tertiary mb-1">SMTP Port</div>
+                    <div class="font-mono text-sm">{{ smtp_port }}</div>
+                </div>
+                <div>
+                    <div class="text-sm text-text-tertiary mb-1">From Address</div>
+                    <div class="font-mono text-sm">{{ smtp_from_address }}</div>
+                </div>
+            </div>
+
+            <div class="mt-6 pt-6 border-t border-border">
+                <div class="text-sm text-text-tertiary mb-2">Notification Recipients</div>
+                {% if recipients %}
+                <div class="flex flex-wrap gap-2">
+                    {% for recipient in recipients %}
+                    <span class="px-3 py-1 bg-bg-elevated border border-border rounded-full text-sm font-mono">
+                        {{ recipient }}
+                    </span>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="text-sm text-text-secondary italic">No recipients configured</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Test Notification -->
+    {% if is_configured %}
+    <div class="card mb-6">
+        <div class="card-header">
+            <h2 class="heading-2">Test Configuration</h2>
+        </div>
+        <div class="card-content">
+            <p class="text-sm text-text-secondary mb-4">
+                Send a test email to verify your SMTP configuration is working correctly.
+            </p>
+            <form action="/zfs/replication/notifications/test" method="post">
+                <button type="submit" class="btn-primary">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                    </svg>
+                    <span>Send Test Email</span>
+                </button>
+            </form>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Configuration Instructions -->
+    <div class="card">
+        <div class="card-header">
+            <h2 class="heading-2">Configuration Instructions</h2>
+        </div>
+        <div class="card-content">
+            <div class="prose prose-invert max-w-none">
+                <p class="text-sm text-text-secondary mb-4">
+                    To enable email notifications, configure the following environment variables in your <code class="px-1.5 py-0.5 bg-bg-base rounded text-xs font-mono">.env</code> file:
+                </p>
+
+                <div class="bg-bg-base rounded p-4 mb-4">
+                    <pre class="text-sm font-mono text-text-secondary whitespace-pre-wrap overflow-x-auto">
+# Email Notification Settings
+SMTP_ENABLED=true
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=your-email@gmail.com
+SMTP_PASSWORD=your-app-password
+SMTP_USE_TLS=true
+SMTP_FROM_ADDRESS=webzfs@yourdomain.com
+SMTP_NOTIFY_ON_SUCCESS=false
+NOTIFICATION_RECIPIENTS=admin@example.com,ops@example.com</pre>
+                </div>
+
+                <h3 class="text-lg font-medium mb-2">Configuration Parameters</h3>
+                
+                <div class="space-y-3">
+                    <div>
+                        <div class="font-medium text-sm">SMTP_ENABLED</div>
+                        <div class="text-sm text-text-secondary">Set to <code class="px-1.5 py-0.5 bg-bg-base rounded text-xs font-mono">true</code> to enable email notifications</div>
+                    </div>
+                    
+                    <div>
+                        <div class="font-medium text-sm">SMTP_HOST</div>
+                        <div class="text-sm text-text-secondary">Your SMTP server hostname (e.g., smtp.gmail.com, smtp.office365.com)</div>
+                    </div>
+                    
+                    <div>
+                        <div class="font-medium text-sm">SMTP_PORT</div>
+                        <div class="text-sm text-text-secondary">SMTP server port (usually 587 for TLS or 465 for SSL)</div>
+                    </div>
+                    
+                    <div>
+                        <div class="font-medium text-sm">SMTP_USER / SMTP_PASSWORD</div>
+                        <div class="text-sm text-text-secondary">Your SMTP authentication credentials</div>
+                    </div>
+                    
+                    <div>
+                        <div class="font-medium text-sm">SMTP_USE_TLS</div>
+                        <div class="text-sm text-text-secondary">Set to <code class="px-1.5 py-0.5 bg-bg-base rounded text-xs font-mono">true</code> to use TLS encryption (recommended)</div>
+                    </div>
+                    
+                    <div>
+                        <div class="font-medium text-sm">SMTP_FROM_ADDRESS</div>
+                        <div class="text-sm text-text-secondary">The "From" address for notification emails</div>
+                    </div>
+                    
+                    <div>
+                        <div class="font-medium text-sm">SMTP_NOTIFY_ON_SUCCESS</div>
+                        <div class="text-sm text-text-secondary">Set to <code class="px-1.5 py-0.5 bg-bg-base rounded text-xs font-mono">true</code> to receive notifications for successful replications (optional)</div>
+                    </div>
+                    
+                    <div>
+                        <div class="font-medium text-sm">NOTIFICATION_RECIPIENTS</div>
+                        <div class="text-sm text-text-secondary">Comma-separated list of email addresses to receive notifications</div>
+                    </div>
+                </div>
+
+                <div class="mt-6 p-4 bg-info-900/20 border border-info-500/30 rounded">
+                    <div class="flex items-start space-x-3">
+                        <svg class="w-5 h-5 text-info-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                        <div class="text-sm text-text-secondary">
+                            <strong class="text-info-400">Note:</strong> After updating the .env file, restart the application for changes to take effect.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

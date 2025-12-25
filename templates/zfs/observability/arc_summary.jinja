@@ -1,0 +1,531 @@
+{% extends "layout_main.jinja" %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block content %}
+<div class="container-page max-w-7xl">
+    <!-- Breadcrumb -->
+    <nav class="text-sm mb-6" aria-label="Breadcrumb">
+        <ol class="flex items-center space-x-2">
+            <li class="flex items-center">
+                <a href="/" class="text-primary-400 hover:text-primary-300 transition-colors">Home</a>
+                <svg class="w-4 h-4 mx-2 text-text-tertiary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                </svg>
+            </li>
+            <li class="flex items-center">
+                <a href="/zfs/observability" class="text-primary-400 hover:text-primary-300 transition-colors">Observability</a>
+                <svg class="w-4 h-4 mx-2 text-text-tertiary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                </svg>
+            </li>
+            <li>
+                <span class="text-text-primary font-medium">ARC Summary</span>
+            </li>
+        </ol>
+    </nav>
+
+    <!-- Page Header -->
+    <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-8">
+        <div>
+            <h1 class="text-3xl font-bold text-text-primary mb-2">ARC Summary</h1>
+            <p class="text-text-secondary">Adaptive Replacement Cache statistics and performance metrics</p>
+        </div>
+        <div class="flex flex-wrap items-center gap-3">
+            <a href="/zfs/observability/arc-summary/download" 
+               class="btn-success flex items-center gap-2"
+               hx-boost="false">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                </svg>
+                Download
+            </a>
+            <span class="text-sm text-text-secondary" id="lastUpdate">Last: <span id="updateTime">Just now</span></span>
+            <button onclick="refreshStats()" class="btn-primary flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                </svg>
+                Refresh
+            </button>
+            <label class="flex items-center gap-2 text-sm cursor-pointer">
+                <input type="checkbox" id="autoRefresh" onchange="toggleAutoRefresh()" class="form-checkbox">
+                <span class="text-text-secondary">Auto (<span id="refreshInterval">10</span>s)</span>
+            </label>
+            <select id="intervalSelect" onchange="updateInterval()" class="form-select text-sm py-1">
+                <option value="1">1s</option>
+                <option value="5">5s</option>
+                <option value="10" selected>10s</option>
+                <option value="30">30s</option>
+                <option value="60">60s</option>
+            </select>
+        </div>
+    </div>
+
+    <!-- Error Message -->
+    {% if error %}
+    <div class="bg-danger-900/30 border-l-4 border-danger-500 text-danger-400 px-4 py-3 rounded mb-6" role="alert">
+        <div class="flex items-start">
+            <svg class="w-5 h-5 mr-3 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+            <div><strong class="font-semibold">Error:</strong> {{ error }}</div>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if arc_stats.get('error') %}
+    <div class="bg-warning-900/30 border-l-4 border-warning-500 text-warning-400 px-4 py-3 rounded mb-6" role="alert">
+        <div class="flex items-start">
+            <svg class="w-5 h-5 mr-3 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+            </svg>
+            <div><strong class="font-semibold">Warning:</strong> {{ arc_stats.error }}</div>
+        </div>
+    </div>
+    {% elif system == 'FreeBSD' %}
+    
+    {# FreeBSD: Show raw zfs-stats -A output (same as Performance > ARC page) #}
+    <div class="bg-primary-900/20 border border-primary-500/30 rounded-lg p-4 mb-6">
+        <p class="text-sm text-primary-300">
+            <strong>System:</strong> FreeBSD - Using <code>zfs-stats -A</code> command (requires zfs-stats package)
+        </p>
+    </div>
+    
+    <div class="card mb-8">
+        <div class="px-6 py-4 border-b border-border-subtle">
+            <h2 class="text-xl font-semibold text-text-primary">Raw ARC Statistics</h2>
+        </div>
+        <div class="p-6">
+            {% if raw_arcstats and not raw_arcstats.get('error') %}
+            <pre class="bg-bg-elevated-2 p-4 rounded border overflow-x-auto text-sm whitespace-pre"
+                 style="font-family: 'Fira Code', 'Cascadia Code', 'JetBrains Mono', 'SF Mono', Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace; tab-size: 4; -moz-tab-size: 4; line-height: 1.5;">{{ raw_arcstats.output }}</pre>
+            {% elif raw_arcstats and raw_arcstats.get('error') %}
+            <div class="bg-warning-900/30 border-l-4 border-warning-500 text-warning-400 px-4 py-3 rounded" role="alert">
+                <div class="flex items-start">
+                    <svg class="w-5 h-5 mr-3 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                    </svg>
+                    <div>
+                        <strong class="font-semibold">Error:</strong> {{ raw_arcstats.error }}
+                        <p class="text-sm mt-2">Install zfs-stats with: <code>pkg install zfs-stats</code></p>
+                        <p class="text-sm">Add to sudoers: <code>webzfs ALL=(ALL) NOPASSWD: /usr/local/bin/zfs-stats</code></p>
+                    </div>
+                </div>
+            </div>
+            {% else %}
+            <p class="text-text-secondary text-center py-4">Loading ARC statistics...</p>
+            {% endif %}
+        </div>
+    </div>
+    
+    <!-- Information Box -->
+    <div class="card-nested bg-info-900/20 border-info-500/20">
+        <h3 class="text-lg font-semibold text-info-400 mb-3 flex items-center gap-2">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+            About the ARC
+        </h3>
+        <div class="text-sm text-info-400 space-y-3">
+            <p>The Adaptive Replacement Cache (ARC) is ZFS's intelligent caching mechanism that stores frequently accessed data in RAM for faster retrieval.</p>
+            <p class="font-semibold">Key Concepts:</p>
+            <ul class="list-disc list-inside ml-4 space-y-1.5">
+                <li><strong>Hit Rate:</strong> Percentage of data requests served from cache. Higher is better (typically 80%+).</li>
+                <li><strong>MRU (Most Recently Used):</strong> Recently accessed data that may be accessed again soon.</li>
+                <li><strong>MFU (Most Frequently Used):</strong> Data accessed frequently over time, likely to be needed again.</li>
+                <li><strong>Size:</strong> Current memory usage. Dynamically adjusts based on system memory pressure.</li>
+            </ul>
+        </div>
+    </div>
+    
+    {% else %}
+    
+    <!-- Key Metrics -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div class="card">
+            <div class="card-body">
+                <h3 class="text-sm font-medium text-text-secondary mb-2">ARC Size</h3>
+                <p class="text-3xl font-bold text-text-primary">{{ arc_stats.get('size_human', 'N/A') }}</p>
+                <p class="text-sm text-text-secondary mt-1">of {{ arc_stats.get('c_max_human', 'N/A') }} max</p>
+                {% if arc_stats.get('size') and arc_stats.get('c_max') %}
+                <div class="mt-3 bg-bg-elevated-3 rounded-full h-2">
+                    <div class="bg-primary-500 h-2 rounded-full" style="width: {{ (arc_stats.size / arc_stats.c_max * 100)|round(1) }}%"></div>
+                </div>
+                <p class="text-xs text-text-secondary mt-1">{{ (arc_stats.size / arc_stats.c_max * 100)|round(1) }}% utilized</p>
+                {% endif %}
+            </div>
+        </div>
+        
+        <div class="card">
+            <div class="card-body">
+                <h3 class="text-sm font-medium text-text-secondary mb-2">Hit Rate</h3>
+                <p class="text-3xl font-bold {% if arc_stats.get('hit_rate', 0) >= 80 %}text-success-400{% elif arc_stats.get('hit_rate', 0) >= 60 %}text-warning-400{% else %}text-danger-400{% endif %}">
+                    {% if arc_stats.get('hit_rate') %}
+                        {{ "%.2f"|format(arc_stats.hit_rate) }}%
+                    {% else %}
+                        N/A
+                    {% endif %}
+                </p>
+                <p class="text-sm text-text-secondary mt-1">cache efficiency</p>
+                {% if arc_stats.get('hit_rate') %}
+                <div class="mt-3 bg-bg-elevated-3 rounded-full h-2">
+                    <div class="{% if arc_stats.hit_rate >= 80 %}bg-success-500{% elif arc_stats.hit_rate >= 60 %}bg-warning-500{% else %}bg-danger-500{% endif %} h-2 rounded-full" style="width: {{ arc_stats.hit_rate }}%"></div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        
+        <div class="card">
+            <div class="card-body">
+                <h3 class="text-sm font-medium text-text-secondary mb-2">Cache Hits</h3>
+                <p class="text-3xl font-bold text-success-400">
+                    {% if arc_stats.get('hits') %}
+                        {{ "{:,}".format(arc_stats.hits) }}
+                    {% else %}
+                        N/A
+                    {% endif %}
+                </p>
+                <p class="text-sm text-text-secondary mt-1">successful reads</p>
+            </div>
+        </div>
+        
+        <div class="card">
+            <div class="card-body">
+                <h3 class="text-sm font-medium text-text-secondary mb-2">Cache Misses</h3>
+                <p class="text-3xl font-bold text-danger-400">
+                    {% if arc_stats.get('misses') %}
+                        {{ "{:,}".format(arc_stats.misses) }}
+                    {% else %}
+                        N/A
+                    {% endif %}
+                </p>
+                <p class="text-sm text-text-secondary mt-1">disk reads required</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cache Type Breakdown -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+        <!-- MRU/MFU Distribution -->
+        <div class="card">
+            <div class="px-6 py-4 border-b border-border-subtle">
+                <h3 class="text-lg font-semibold text-text-primary">Cache Distribution (MRU vs MFU)</h3>
+            </div>
+            <div class="p-6">
+                {% if arc_stats.get('mru_hits') and arc_stats.get('mfu_hits') %}
+                {% set mru_total = arc_stats.mru_hits %}
+                {% set mfu_total = arc_stats.mfu_hits %}
+                {% set total_hits = mru_total + mfu_total %}
+                {% if total_hits > 0 %}
+                <div class="space-y-4">
+                    <div>
+                        <div class="flex justify-between text-sm mb-2">
+                            <span class="font-medium text-text-primary">MRU (Most Recently Used)</span>
+                            <span class="text-text-secondary">{{ "{:,}".format(mru_total) }} ({{ (mru_total / total_hits * 100)|round(1) }}%)</span>
+                        </div>
+                        <div class="bg-bg-elevated-3 rounded-full h-6">
+                            <div class="bg-primary-500 h-6 rounded-full flex items-center justify-end pr-2" style="width: {{ (mru_total / total_hits * 100)|round(1) }}%">
+                                <span class="text-white text-xs font-bold">{{ (mru_total / total_hits * 100)|round(1) }}%</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="flex justify-between text-sm mb-2">
+                            <span class="font-medium text-text-primary">MFU (Most Frequently Used)</span>
+                            <span class="text-text-secondary">{{ "{:,}".format(mfu_total) }} ({{ (mfu_total / total_hits * 100)|round(1) }}%)</span>
+                        </div>
+                        <div class="bg-bg-elevated-3 rounded-full h-6">
+                            <div class="bg-success-500 h-6 rounded-full flex items-center justify-end pr-2" style="width: {{ (mfu_total / total_hits * 100)|round(1) }}%">
+                                <span class="text-white text-xs font-bold">{{ (mfu_total / total_hits * 100)|round(1) }}%</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+                {% else %}
+                <p class="text-text-secondary text-center py-4">MRU/MFU data not available</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Demand vs Prefetch -->
+        <div class="card">
+            <div class="px-6 py-4 border-b border-border-subtle">
+                <h3 class="text-lg font-semibold text-text-primary">Access Type Breakdown</h3>
+            </div>
+            <div class="p-6">
+                {% if arc_stats.get('demand_data_hits') and arc_stats.get('demand_metadata_hits') %}
+                {% set demand_hits = arc_stats.get('demand_data_hits', 0) + arc_stats.get('demand_metadata_hits', 0) %}
+                {% set prefetch_hits = arc_stats.get('prefetch_data_hits', 0) + arc_stats.get('prefetch_metadata_hits', 0) %}
+                {% set total = demand_hits + prefetch_hits %}
+                {% if total > 0 %}
+                <div class="space-y-4">
+                    <div>
+                        <div class="flex justify-between text-sm mb-2">
+                            <span class="font-medium text-text-primary">Demand (On-Request)</span>
+                            <span class="text-text-secondary">{{ "{:,}".format(demand_hits) }} ({{ (demand_hits / total * 100)|round(1) }}%)</span>
+                        </div>
+                        <div class="bg-bg-elevated-3 rounded-full h-6">
+                            <div class="bg-purple-500 h-6 rounded-full flex items-center justify-end pr-2" style="width: {{ (demand_hits / total * 100)|round(1) }}%">
+                                <span class="text-white text-xs font-bold">{{ (demand_hits / total * 100)|round(1) }}%</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="flex justify-between text-sm mb-2">
+                            <span class="font-medium text-text-primary">Prefetch (Predictive)</span>
+                            <span class="text-text-secondary">{{ "{:,}".format(prefetch_hits) }} ({{ (prefetch_hits / total * 100)|round(1) }}%)</span>
+                        </div>
+                        <div class="bg-bg-elevated-3 rounded-full h-6">
+                            <div class="bg-warning-500 h-6 rounded-full flex items-center justify-end pr-2" style="width: {{ (prefetch_hits / total * 100)|round(1) }}%">
+                                <span class="text-white text-xs font-bold">{{ (prefetch_hits / total * 100)|round(1) }}%</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+                {% else %}
+                <p class="text-text-secondary text-center py-4">Access type data not available</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Detailed Statistics by Category -->
+    <div class="card mb-8">
+        <div class="px-6 py-4 border-b border-border-subtle">
+            <h2 class="text-xl font-semibold text-text-primary">Detailed Statistics</h2>
+        </div>
+        
+        <div class="p-6">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <!-- Memory Statistics -->
+                <div>
+                    <h3 class="text-lg font-semibold mb-3 text-text-primary flex items-center gap-2">
+                        <svg class="w-5 h-5 text-primary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"/>
+                        </svg>
+                        Memory Statistics
+                    </h3>
+                    <div class="space-y-2">
+                        {% for key in ['size', 'c', 'c_min', 'c_max', 'p', 'mru_size', 'mfu_size'] %}
+                        {% if arc_stats.get(key) %}
+                        <div class="flex justify-between text-sm py-2 border-b border-border-subtle">
+                            <span class="text-text-secondary">{{ key }}</span>
+                            <span class="font-mono text-text-primary">{{ "{:,}".format(arc_stats[key]) }}</span>
+                        </div>
+                        {% endif %}
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <!-- Hit/Miss Statistics -->
+                <div>
+                    <h3 class="text-lg font-semibold mb-3 text-text-primary flex items-center gap-2">
+                        <svg class="w-5 h-5 text-success-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                        </svg>
+                        Hit/Miss Statistics
+                    </h3>
+                    <div class="space-y-2">
+                        {% for key in ['hits', 'misses', 'demand_data_hits', 'demand_data_misses', 'demand_metadata_hits', 'demand_metadata_misses', 'prefetch_data_hits', 'prefetch_data_misses'] %}
+                        {% if arc_stats.get(key) %}
+                        <div class="flex justify-between text-sm py-2 border-b border-border-subtle">
+                            <span class="text-text-secondary">{{ key }}</span>
+                            <span class="font-mono text-text-primary">{{ "{:,}".format(arc_stats[key]) }}</span>
+                        </div>
+                        {% endif %}
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <!-- MRU/MFU Statistics -->
+                <div>
+                    <h3 class="text-lg font-semibold mb-3 text-text-primary flex items-center gap-2">
+                        <svg class="w-5 h-5 text-info-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"/>
+                        </svg>
+                        MRU/MFU Statistics
+                    </h3>
+                    <div class="space-y-2">
+                        {% for key in ['mru_hits', 'mru_ghost_hits', 'mfu_hits', 'mfu_ghost_hits'] %}
+                        {% if arc_stats.get(key) %}
+                        <div class="flex justify-between text-sm py-2 border-b border-border-subtle">
+                            <span class="text-text-secondary">{{ key }}</span>
+                            <span class="font-mono text-text-primary">{{ "{:,}".format(arc_stats[key]) }}</span>
+                        </div>
+                        {% endif %}
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <!-- I/O Statistics -->
+                <div>
+                    <h3 class="text-lg font-semibold mb-3 text-text-primary flex items-center gap-2">
+                        <svg class="w-5 h-5 text-warning-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/>
+                        </svg>
+                        I/O Statistics
+                    </h3>
+                    <div class="space-y-2">
+                        {% for key in ['iohits', 'demand_data_iohits', 'demand_metadata_iohits', 'prefetch_data_iohits', 'prefetch_metadata_iohits'] %}
+                        {% if arc_stats.get(key) %}
+                        <div class="flex justify-between text-sm py-2 border-b border-border-subtle">
+                            <span class="text-text-secondary">{{ key }}</span>
+                            <span class="font-mono text-text-primary">{{ "{:,}".format(arc_stats[key]) }}</span>
+                        </div>
+                        {% endif %}
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- All Other Statistics -->
+            <div class="mt-8">
+                <h3 class="text-lg font-semibold mb-4 text-text-primary">Additional Statistics</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6">
+                    {% for key, value in arc_stats.items() %}
+                    {% if key not in ['error', 'size_human', 'c_max_human', 'hit_rate', 'size', 'c', 'c_min', 'c_max', 'p', 'mru_size', 'mfu_size', 'hits', 'misses', 'demand_data_hits', 'demand_data_misses', 'demand_metadata_hits', 'demand_metadata_misses', 'prefetch_data_hits', 'prefetch_data_misses', 'mru_hits', 'mru_ghost_hits', 'mfu_hits', 'mfu_ghost_hits', 'iohits', 'demand_data_iohits', 'demand_metadata_iohits', 'prefetch_data_iohits', 'prefetch_metadata_iohits'] %}
+                    <div class="flex justify-between text-sm py-2 border-b border-border-subtle">
+                        <span class="text-text-secondary">{{ key }}</span>
+                        <span class="font-mono text-text-primary text-xs">{{ value }}</span>
+                    </div>
+                    {% endif %}
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Information Box -->
+    <div class="card-nested bg-info-900/20 border-info-500/20">
+        <h3 class="text-lg font-semibold text-info-400 mb-3 flex items-center gap-2">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+            About the ARC
+        </h3>
+        <div class="text-sm text-info-400 space-y-3">
+            <p>The Adaptive Replacement Cache (ARC) is ZFS's intelligent caching mechanism that stores frequently accessed data in RAM for faster retrieval.</p>
+            <p class="font-semibold">Key Concepts:</p>
+            <ul class="list-disc list-inside ml-4 space-y-1.5">
+                <li><strong>Hit Rate:</strong> Percentage of data requests served from cache. Higher is better (typically 80%+). Good hit rates reduce disk I/O significantly.</li>
+                <li><strong>MRU (Most Recently Used):</strong> Recently accessed data that may be accessed again soon.</li>
+                <li><strong>MFU (Most Frequently Used):</strong> Data accessed frequently over time, likely to be needed again.</li>
+                <li><strong>Size:</strong> Current memory usage. Dynamically adjusts based on system memory pressure and workload.</li>
+                <li><strong>Demand Hits:</strong> Cache hits for explicitly requested data.</li>
+                <li><strong>Prefetch Hits:</strong> Cache hits for predictively loaded data.</li>
+            </ul>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+let refreshTimer = null;
+let refreshIntervalSeconds = 10;
+let lastRefreshTime = new Date();
+
+function loadSettings() {
+    const savedInterval = localStorage.getItem('arcRefreshInterval');
+    const savedAutoRefresh = localStorage.getItem('arcAutoRefresh');
+    
+    if (savedInterval) {
+        refreshIntervalSeconds = parseInt(savedInterval);
+        document.getElementById('intervalSelect').value = savedInterval;
+        document.getElementById('refreshInterval').textContent = savedInterval;
+    }
+    
+    if (savedAutoRefresh === 'true') {
+        document.getElementById('autoRefresh').checked = true;
+        startAutoRefresh();
+    }
+}
+
+function saveSettings() {
+    localStorage.setItem('arcRefreshInterval', refreshIntervalSeconds);
+    localStorage.setItem('arcAutoRefresh', document.getElementById('autoRefresh').checked);
+}
+
+function updateTimeDisplay() {
+    const now = new Date();
+    const diff = Math.floor((now - lastRefreshTime) / 1000);
+    
+    if (diff < 60) {
+        document.getElementById('updateTime').textContent = diff === 0 ? 'Just now' : `${diff}s ago`;
+    } else {
+        const minutes = Math.floor(diff / 60);
+        document.getElementById('updateTime').textContent = `${minutes}m ago`;
+    }
+}
+
+function refreshStats() {
+    window.location.reload();
+}
+
+function toggleAutoRefresh() {
+    const checkbox = document.getElementById('autoRefresh');
+    
+    if (checkbox.checked) {
+        startAutoRefresh();
+    } else {
+        stopAutoRefresh();
+    }
+    
+    saveSettings();
+}
+
+function startAutoRefresh() {
+    stopAutoRefresh();
+    refreshTimer = setInterval(refreshStats, refreshIntervalSeconds * 1000);
+}
+
+function stopAutoRefresh() {
+    if (refreshTimer) {
+        clearInterval(refreshTimer);
+        refreshTimer = null;
+    }
+}
+
+function updateInterval() {
+    const select = document.getElementById('intervalSelect');
+    refreshIntervalSeconds = parseInt(select.value);
+    document.getElementById('refreshInterval').textContent = refreshIntervalSeconds;
+    
+    saveSettings();
+    
+    const checkbox = document.getElementById('autoRefresh');
+    if (checkbox.checked) {
+        startAutoRefresh();
+    }
+}
+
+const timeDisplayInterval = setInterval(updateTimeDisplay, 1000);
+
+loadSettings();
+updateTimeDisplay();
+
+// Cleanup on page unload/navigation
+window.addEventListener('beforeunload', () => {
+    stopAutoRefresh();
+    if (timeDisplayInterval) {
+        clearInterval(timeDisplayInterval);
+    }
+});
+
+// Pause when page is hidden, resume when visible
+document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+        stopAutoRefresh();
+        if (timeDisplayInterval) {
+            clearInterval(timeDisplayInterval);
+        }
+    } else {
+        const checkbox = document.getElementById('autoRefresh');
+        if (checkbox && checkbox.checked) {
+            startAutoRefresh();
+        }
+    }
+});
+</script>
+{% endblock %}

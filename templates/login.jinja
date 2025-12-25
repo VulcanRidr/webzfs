@@ -1,0 +1,155 @@
+{% extends "base.jinja" %}
+
+{% block body %}
+  <div class="min-h-screen flex items-center justify-center px-4 py-12 bg-bg-base">
+    <!-- Background decoration -->
+    <div class="absolute inset-0 overflow-hidden pointer-events-none">
+      <div class="absolute top-0 left-1/4 w-96 h-96 bg-primary-500/5 rounded-full blur-3xl"></div>
+      <div class="absolute bottom-0 right-1/4 w-96 h-96 bg-purple-500/5 rounded-full blur-3xl"></div>
+    </div>
+
+    <!-- Login card -->
+    <div class="relative w-full max-w-md animate-slide-in">
+      <!-- Logo/Branding -->
+      <div class="text-center mb-8">
+        <div class="inline-flex items-center justify-center w-16 h-16 bg-primary-500/10 border-2 border-primary-500/20 rounded-2xl mb-4">
+          <svg class="w-10 h-10 text-primary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"></path>
+          </svg>
+        </div>
+        <h1 class="text-3xl font-bold text-text-primary mb-2">ZFS Management</h1>
+        <p class="text-text-secondary">Sign in to your account</p>
+      </div>
+
+      <!-- Login form card -->
+      <div class="card shadow-2xl">
+        <div class="card-body">
+          <form id="login-form" 
+                action="/login/" 
+                method="post"
+                hx-post="/login/"
+                hx-target="body"
+                hx-swap="innerHTML"
+                hx-push-url="true"
+                class="space-y-6">
+            
+            <!-- Error message -->
+            {% if error %}
+            <div id="login-error" class="p-4 rounded-lg {% if rate_limited %}bg-red-500/20 border border-red-500/30{% else %}bg-yellow-500/20 border border-yellow-500/30{% endif %}">
+              <div class="flex items-start gap-3">
+                {% if rate_limited %}
+                <svg class="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                </svg>
+                <div>
+                  <p class="text-red-300 font-medium">Account Temporarily Locked</p>
+                  <p class="text-red-400 text-sm mt-1">{{ error }}</p>
+                  {% if retry_after %}
+                  <p class="text-red-400 text-sm mt-2">
+                    <span id="countdown-timer" class="font-mono font-bold">{{ retry_after }}</span> seconds remaining
+                  </p>
+                  {% endif %}
+                </div>
+                {% else %}
+                <svg class="w-5 h-5 text-yellow-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                <div>
+                  <p class="text-yellow-300 font-medium">Authentication Failed</p>
+                  <p class="text-yellow-400 text-sm mt-1">{{ error }}</p>
+                </div>
+                {% endif %}
+              </div>
+            </div>
+            {% else %}
+            <div id="login-error"></div>
+            {% endif %}
+
+            <!-- Username field -->
+            <div>
+              {% with label="Username",field="username",required=True,placeholder="Enter your username" %}
+                {% include "partials/input.jinja" %}
+              {% endwith %}
+            </div>
+
+            <!-- Password field -->
+            <div>
+              {% with label="Password",field="password",type="password",required=True,placeholder="Enter your password" %}
+                {% include "partials/input.jinja" %}
+              {% endwith %}
+            </div>
+
+            <!-- Submit button -->
+            <button type="submit" 
+                    id="submit-btn"
+                    class="btn-primary w-full relative group{% if rate_limited %} opacity-50 cursor-not-allowed{% endif %}"
+                    {% if rate_limited %}disabled{% endif %}
+                    hx-indicator="#login-spinner">
+              <span class="flex items-center justify-center gap-2">
+                <svg id="login-spinner" class="htmx-indicator w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <span>Sign In</span>
+                <svg class="w-5 h-5 transform group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
+                </svg>
+              </span>
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <!-- Footer -->
+      <div class="text-center mt-6 text-text-tertiary text-sm">
+        <p>ZFS on Linux Management Interface</p>
+      </div>
+    </div>
+  </div>
+
+  {% if rate_limited and retry_after %}
+  <script>
+    (function() {
+      let countdown = {{ retry_after }};
+      const timerEl = document.getElementById('countdown-timer');
+      const submitBtn = document.getElementById('submit-btn');
+      
+      const updateTimer = () => {
+        if (countdown <= 0) {
+          // Re-enable the form
+          if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+          }
+          // Update the error message
+          const errorDiv = document.getElementById('login-error');
+          if (errorDiv) {
+            errorDiv.innerHTML = `
+              <div class="flex items-start gap-3">
+                <svg class="w-5 h-5 text-green-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                <div>
+                  <p class="text-green-300 font-medium">You can try again</p>
+                  <p class="text-green-400 text-sm mt-1">The rate limit has expired. Please enter your credentials.</p>
+                </div>
+              </div>
+            `;
+            errorDiv.className = 'p-4 rounded-lg bg-green-500/20 border border-green-500/30';
+          }
+          return;
+        }
+        
+        if (timerEl) {
+          timerEl.textContent = countdown;
+        }
+        countdown--;
+        setTimeout(updateTimer, 1000);
+      };
+      
+      // Start the countdown
+      setTimeout(updateTimer, 1000);
+    })();
+  </script>
+  {% endif %}
+{% endblock %}

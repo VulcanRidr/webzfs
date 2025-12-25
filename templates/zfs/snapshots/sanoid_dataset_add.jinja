@@ -1,0 +1,219 @@
+{% extends "layout.jinja" %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8 max-w-4xl">
+    <!-- Breadcrumb Navigation -->
+    <nav class="text-sm text-text-secondary mb-4 flex items-center gap-2">
+        <a href="/zfs/pools" class="hover:text-text-primary transition-colors">Pools</a>
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+        </svg>
+        <a href="/zfs/snapshots" class="hover:text-text-primary transition-colors">Snapshots</a>
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+        </svg>
+        <a href="/zfs/snapshots/sanoid" class="hover:text-text-primary transition-colors">Sanoid</a>
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+        </svg>
+        <span class="text-text-primary">Add Dataset</span>
+    </nav>
+
+    <!-- Page Header -->
+    <div class="mb-6">
+        <h1 class="text-3xl font-bold text-text-primary">Add Dataset to Sanoid</h1>
+        <p class="text-text-secondary mt-2">Configure automated snapshot policy for a dataset</p>
+    </div>
+
+    <!-- Error Message -->
+    {% if error %}
+    {% include "partials/error.jinja" %}
+    {% endif %}
+
+    <!-- Info Box -->
+    <div class="card-nested bg-info-900/20 border-info-900 mb-6">
+        <div class="flex items-start gap-3">
+            <svg class="w-5 h-5 text-info-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+            <div class="text-sm">
+                <strong class="text-info-400">Info:</strong>
+                <span class="text-text-secondary">Adding a dataset to Sanoid will enable automated snapshot creation and pruning according to the selected template policy.</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Form -->
+    <div class="card">
+        <form method="post" action="/zfs/snapshots/sanoid/dataset/add">
+            <!-- Dataset Selection -->
+            <div class="mb-6">
+                <label for="dataset_name" class="form-label">
+                    Dataset <span class="text-danger-400">*</span>
+                </label>
+                {% if datasets and datasets|length > 0 %}
+                <select 
+                    id="dataset_name" 
+                    name="dataset_name" 
+                    required
+                    class="form-select"
+                >
+                    <option value="">-- Select a Dataset --</option>
+                    {% for ds in datasets %}
+                    <option value="{{ ds.name }}">{{ ds.name }}</option>
+                    {% endfor %}
+                </select>
+                <p class="text-text-tertiary text-xs mt-1">
+                    Choose the dataset you want to enable automated snapshots for
+                </p>
+                {% else %}
+                <div class="card-nested bg-warning-900/20 border-warning-900">
+                    <div class="flex items-start gap-3">
+                        <svg class="w-5 h-5 text-warning-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                        </svg>
+                        <div class="text-sm">
+                            <strong class="text-warning-400">Warning:</strong>
+                            <span class="text-text-secondary">No datasets found.</span>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Template Selection -->
+            <div class="mb-6">
+                <label for="template" class="form-label">
+                    Snapshot Policy Template <span class="text-danger-400">*</span>
+                </label>
+                {% if templates and templates|length > 0 %}
+                <select 
+                    id="template" 
+                    name="template" 
+                    required
+                    onchange="showTemplateInfo()"
+                    class="form-select"
+                >
+                    <option value="">-- Select a Template --</option>
+                    {% for template_name, config in templates.items() %}
+                    <option value="{{ template_name.replace('template_', '') }}" data-config='{{ config|tojson }}'>
+                        {{ template_name.replace('template_', '') }}
+                    </option>
+                    {% endfor %}
+                </select>
+                <p class="text-text-tertiary text-xs mt-1">
+                    Select a retention policy template that defines how often snapshots are taken and how long they're kept
+                </p>
+                <div id="template_info" class="mt-3 hidden card-nested bg-primary-900/20 border-primary-900"></div>
+                {% else %}
+                <div class="card-nested bg-warning-900/20 border-warning-900">
+                    <div class="flex items-start gap-3">
+                        <svg class="w-5 h-5 text-warning-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                        </svg>
+                        <div class="text-sm">
+                            <strong class="text-warning-400">Warning:</strong>
+                            <span class="text-text-secondary">No templates found. <a href="/zfs/snapshots/sanoid/template/create" class="text-primary-400 hover:text-primary-300">Create a template first</a>.</span>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Recursive Option -->
+            <div class="mb-6">
+                <label for="recursive" class="form-label">
+                    Recursive Mode <span class="text-danger-400">*</span>
+                </label>
+                <select 
+                    id="recursive" 
+                    name="recursive" 
+                    required
+                    class="form-select"
+                >
+                    <option value="no">No - Only this dataset</option>
+                    <option value="yes">Yes - Process children individually</option>
+                    <option value="zfs">ZFS - Atomic recursive snapshots</option>
+                </select>
+                <div class="mt-2 card-nested text-xs space-y-2">
+                    <div class="flex items-start gap-2">
+                        <svg class="w-4 h-4 text-text-tertiary flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                        </svg>
+                        <div>
+                            <strong class="text-text-primary">no:</strong>
+                            <span class="text-text-secondary">Only snapshot this dataset</span>
+                        </div>
+                    </div>
+                    <div class="flex items-start gap-2">
+                        <svg class="w-4 h-4 text-text-tertiary flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                        </svg>
+                        <div>
+                            <strong class="text-text-primary">yes:</strong>
+                            <span class="text-text-secondary">Snapshot children individually (newly added children get immediate policy)</span>
+                        </div>
+                    </div>
+                    <div class="flex items-start gap-2">
+                        <svg class="w-4 h-4 text-text-tertiary flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                        </svg>
+                        <div>
+                            <strong class="text-text-primary">zfs:</strong>
+                            <span class="text-text-secondary">Use ZFS recursive flag (atomic, consistent snapshots)</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="flex gap-4">
+                <button 
+                    type="submit"
+                    class="btn-success flex items-center gap-2"
+                >
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+                    </svg>
+                    Add Dataset
+                </button>
+                <a 
+                    href="/zfs/snapshots/sanoid" 
+                    class="btn-secondary flex items-center gap-2"
+                >
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                    Cancel
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function showTemplateInfo() {
+    const select = document.getElementById('template');
+    const infoDiv = document.getElementById('template_info');
+    const option = select.options[select.selectedIndex];
+    
+    if (option.value) {
+        const config = JSON.parse(option.getAttribute('data-config'));
+        let html = '<div class="flex items-center gap-2 mb-2"><svg class="w-4 h-4 text-primary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg><strong class="text-primary-400">Retention Policy:</strong></div><div class="grid grid-cols-2 gap-2 text-xs">';
+        
+        if (config.frequently && config.frequently !== '0') html += `<div class="text-text-secondary">Frequently: <span class="text-info-400 font-semibold">${config.frequently}</span></div>`;
+        if (config.hourly && config.hourly !== '0') html += `<div class="text-text-secondary">Hourly: <span class="text-info-400 font-semibold">${config.hourly}</span></div>`;
+        if (config.daily && config.daily !== '0') html += `<div class="text-text-secondary">Daily: <span class="text-success-400 font-semibold">${config.daily}</span></div>`;
+        if (config.weekly && config.weekly !== '0') html += `<div class="text-text-secondary">Weekly: <span class="text-warning-400 font-semibold">${config.weekly}</span></div>`;
+        if (config.monthly && config.monthly !== '0') html += `<div class="text-text-secondary">Monthly: <span class="text-purple-400 font-semibold">${config.monthly}</span></div>`;
+        if (config.yearly && config.yearly !== '0') html += `<div class="text-text-secondary">Yearly: <span class="text-primary-400 font-semibold">${config.yearly}</span></div>`;
+        
+        html += '</div>';
+        infoDiv.innerHTML = html;
+        infoDiv.classList.remove('hidden');
+    } else {
+        infoDiv.classList.add('hidden');
+    }
+}
+</script>
+{% endblock %}

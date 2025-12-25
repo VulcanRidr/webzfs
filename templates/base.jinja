@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="ZFS Management Interface" />
+    <script
+      src="https://unpkg.com/htmx.org@1.9.10"
+      integrity="sha384-D1Kt99CQMDuVetoL1lrYwg5t+9QdHe7NLX/SoJYkXDFfX37iInKRy5xLSi8nO7UC"
+      crossorigin="anonymous"
+    ></script>
+    <script
+      defer
+      src="https://cdn.jsdelivr.net/npm/alpinejs@3.13.3/dist/cdn.min.js"
+    ></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', path='css/styles.css') }}"
+    />
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💾</text></svg>">
+    <title>{% block title %}ZFS Management{% endblock %}</title>
+  </head>
+  <body class="bg-bg-base text-text-primary overscroll-none antialiased" hx-boost="true" hx-indicator="#page-loading">
+    {# Global page loading indicator #}
+    <div id="page-loading" class="htmx-indicator fixed top-0 left-0 right-0 z-50">
+      <div class="h-1 bg-primary-500 transition-all duration-300 ease-out" style="width: 0%; animation: progress-bar 1s ease-in-out infinite;"></div>
+    </div>
+    
+    {% block body %}{% endblock %}
+    {% block after_body %}{% endblock %}
+  </body>
+</html>

@@ -1,0 +1,20 @@
+<div class="mb-4">
+    <div class="flex items-start gap-2 mb-1">
+        <span class="text-success-400 font-bold">#</span>
+        <pre class="text-text-primary font-mono text-sm">{{ input_command }}</pre>
+    </div>
+    {% if output %}
+    <pre class="text-text-secondary font-mono text-sm whitespace-pre-wrap ml-5">{{ output }}</pre>
+    {% endif %}
+</div>
+
+<!-- Update CWD display via HTMX out-of-band swap -->
+<div id="cwd" hx-swap-oob="innerHTML">
+    <span class="text-primary-400 font-mono text-sm">{{ cwd }}</span>
+</div>
+
+{% if error %}
+<div id="error" hx-swap-oob="true">
+    {% include "partials/error.jinja" %}
+</div>
+{% endif %}

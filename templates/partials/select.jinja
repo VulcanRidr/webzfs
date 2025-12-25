@@ -1,0 +1,66 @@
+{# 
+  Reusable select dropdown component
+  
+  Parameters:
+  - field: select field name/id (required)
+  - label: label text (required)
+  - options: list of options [{'value': 'val', 'label': 'Label'}, ...] (required)
+  - required: whether field is required (default: false)
+  - selected: currently selected value
+  - disabled: whether field is disabled
+  - help: help text to show below select
+  - error: error message to display
+  - classes: additional CSS classes
+  - placeholder: placeholder option text
+#}
+
+<div class="form-group {% if error %}has-error{% endif %}">
+  {# Label #}
+  <label class="form-label" for="{{ field }}">
+    {{ label }}
+    {% if required %}
+      <span class="text-danger-400 ml-1" title="Required field">*</span>
+    {% endif %}
+  </label>
+
+  {# Select Field #}
+  <select 
+    class="form-select {% if error %}border-danger-500 focus:border-danger-500 focus:ring-danger-500/20{% endif %} {{ classes }}"
+    id="{{ field }}" 
+    name="{{ field }}"
+    {% if required %}required{% endif %}
+    {% if disabled %}disabled{% endif %}
+  >
+    {# Placeholder Option #}
+    {% if placeholder %}
+      <option value="" {% if not selected %}selected{% endif %} disabled>{{ placeholder }}</option>
+    {% endif %}
+
+    {# Options #}
+    {% for option in options %}
+      <option 
+        value="{{ option.value }}" 
+        {% if selected == option.value or (selected == option.value|string) %}selected{% endif %}
+      >
+        {{ option.label }}
+      </option>
+    {% endfor %}
+  </select>
+
+  {# Help Text #}
+  {% if help and not error %}
+    <p class="form-help">
+      {{ help }}
+    </p>
+  {% endif %}
+
+  {# Error Message #}
+  {% if error %}
+    <p class="form-error">
+      <svg class="w-4 h-4 inline mr-1" fill="currentColor" viewBox="0 0 20 20">
+        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/>
+      </svg>
+      {{ error }}
+    </p>
+  {% endif %}
+</div>

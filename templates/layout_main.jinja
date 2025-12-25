@@ -1,0 +1,20 @@
+{% extends "layout.jinja" %}
+
+{% block content %}
+    <!-- Breadcrumb Navigation -->
+    <nav class="text-sm mb-6 text-text-tertiary">
+        <a href="/utils" class="hover:text-primary-400">Utilities</a> 
+        <span class="mx-2">/</span> 
+        <span class="text-text-primary">{% block breadcrumb_title %}{{ self.caption() }}{% endblock %}</span>
+    </nav>
+
+    <div class="card animate-slide-in">
+        <div class="card-body">
+            <h2 class="text-3xl font-semibold text-text-primary mb-section">
+                {% block caption %}{% endblock %}
+            </h2>
+            {% block inner %}
+            {% endblock %}
+        </div>
+    </div>
+{% endblock %}

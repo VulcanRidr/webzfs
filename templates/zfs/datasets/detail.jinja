@@ -1,0 +1,497 @@
+{% extends "layout.jinja" %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Breadcrumb Navigation -->
+    <nav class="flex items-center text-sm text-text-secondary">
+        <a href="/zfs/pools" class="hover:text-text-primary transition-colors">Pools</a>
+        <svg class="w-4 h-4 mx-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+        </svg>
+        <a href="/zfs/datasets" class="hover:text-text-primary transition-colors">Datasets</a>
+        <svg class="w-4 h-4 mx-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+        </svg>
+        <span class="text-text-primary font-medium">{{ dataset.name if dataset else 'Dataset' }}</span>
+    </nav>
+
+    <!-- Page Header -->
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+            <h1 class="text-3xl font-bold text-text-primary">Dataset: {{ dataset.name if dataset else 'Error' }}</h1>
+            <p class="text-text-secondary mt-1">View and manage dataset configuration</p>
+        </div>
+        {% if dataset %}
+        <div class="flex flex-wrap gap-2">
+            <a href="/zfs/datasets/{{ dataset.name }}/properties" class="btn-success inline-flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                </svg>
+                Manage Properties
+            </a>
+            <a href="/zfs/datasets/{{ dataset.name }}/rename/form" class="btn-primary inline-flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                </svg>
+                Rename
+            </a>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Success/Error Messages -->
+    {% if request.query_params.get('message') %}
+        {% with message=request.query_params.get('message') %}
+            {% include "partials/success.jinja" %}
+        {% endwith %}
+    {% endif %}
+    
+    {% if request.query_params.get('error') %}
+        {% with message=request.query_params.get('error') %}
+            {% include "partials/error.jinja" %}
+        {% endwith %}
+    {% endif %}
+    
+    {% if error %}
+        {% include "partials/error.jinja" %}
+    {% endif %}
+
+    {% if dataset %}
+    <!-- Dataset Information Grid -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Basic Information -->
+        <div class="card">
+            <div class="card-body">
+                <h2 class="text-xl font-semibold text-text-primary mb-4 pb-3 border-b border-border-subtle">Basic Information</h2>
+                <dl class="space-y-3">
+                    <div class="flex justify-between items-center">
+                        <dt class="text-text-secondary">Dataset Name:</dt>
+                        <dd class="text-text-primary font-semibold font-mono text-sm">{{ dataset.name }}</dd>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <dt class="text-text-secondary">Type:</dt>
+                        <dd>
+                            {% if dataset.properties.type.value == 'filesystem' %}
+                                <span class="badge-info">{{ dataset.properties.type.value }}</span>
+                            {% elif dataset.properties.type.value == 'volume' %}
+                                <span class="badge-secondary">{{ dataset.properties.type.value }}</span>
+                            {% else %}
+                                <span class="badge">{{ dataset.properties.type.value }}</span>
+                            {% endif %}
+                        </dd>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <dt class="text-text-secondary">Creation:</dt>
+                        <dd class="text-text-primary">{{ dataset.properties.creation.value }}</dd>
+                    </div>
+                    {% if 'encryption' in dataset.properties %}
+                    <div class="flex justify-between items-center">
+                        <dt class="text-text-secondary">Encryption:</dt>
+                        <dd>
+                            {% if dataset.properties.encryption.value not in ['off', '-'] %}
+                                <span class="inline-flex items-center gap-1 text-success-400">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+                                    </svg>
+                                    {{ dataset.properties.encryption.value }}
+                                </span>
+                            {% else %}
+                                <span class="inline-flex items-center gap-1 text-text-tertiary">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z"></path>
+                                    </svg>
+                                    Not encrypted
+                                </span>
+                            {% endif %}
+                        </dd>
+                    </div>
+                    {% endif %}
+                    {% if dataset.properties.type.value == 'filesystem' %}
+                    <div class="flex justify-between items-center">
+                        <dt class="text-text-secondary">Mountpoint:</dt>
+                        <dd class="text-text-primary font-mono text-sm">{{ dataset.properties.mountpoint.value }}</dd>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <dt class="text-text-secondary">Mounted:</dt>
+                        <dd>
+                            {% if dataset.properties.mounted.value == 'yes' %}
+                            <span class="inline-flex items-center gap-1 text-success-400">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                </svg>
+                                Yes
+                            </span>
+                            {% else %}
+                            <span class="inline-flex items-center gap-1 text-text-tertiary">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                </svg>
+                                No
+                            </span>
+                            {% endif %}
+                        </dd>
+                    </div>
+                    {% endif %}
+                </dl>
+            </div>
+        </div>
+
+        <!-- Storage Information -->
+        <div class="card">
+            <div class="card-body">
+                <h2 class="text-xl font-semibold text-text-primary mb-4 pb-3 border-b border-border-subtle">Storage Information</h2>
+                {% if space_usage and space_usage|length > 0 %}
+                {% set usage = space_usage[0] %}
+                <dl class="space-y-3">
+                    <div class="flex justify-between items-center">
+                        <dt class="text-text-secondary">Used:</dt>
+                        <dd class="text-text-primary font-semibold">{{ usage.used }}</dd>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <dt class="text-text-secondary">Available:</dt>
+                        <dd class="text-text-primary font-semibold">{{ usage.avail }}</dd>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <dt class="text-text-secondary">Referenced:</dt>
+                        <dd class="text-text-primary">{{ usage.refer }}</dd>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <dt class="text-text-secondary">Used by Snapshots:</dt>
+                        <dd class="text-text-primary">{{ usage.usedsnap }}</dd>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <dt class="text-text-secondary">Used by Dataset:</dt>
+                        <dd class="text-text-primary">{{ usage.usedds }}</dd>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <dt class="text-text-secondary">Used by Children:</dt>
+                        <dd class="text-text-primary">{{ usage.usedchild }}</dd>
+                    </div>
+                </dl>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Compression & Performance -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div class="card">
+            <div class="card-body">
+                <h2 class="text-xl font-semibold text-text-primary mb-4 pb-3 border-b border-border-subtle">Compression & Performance</h2>
+                <dl class="space-y-3">
+                    <div class="flex justify-between items-center">
+                        <dt class="text-text-secondary">Compression:</dt>
+                        <dd class="text-text-primary">{{ dataset.properties.compression.value }}</dd>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <dt class="text-text-secondary">Compression Ratio:</dt>
+                        <dd class="text-text-primary font-semibold">{{ dataset.properties.compressratio.value }}</dd>
+                    </div>
+                    {% if 'recordsize' in dataset.properties %}
+                    <div class="flex justify-between items-center">
+                        <dt class="text-text-secondary">Record Size:</dt>
+                        <dd class="text-text-primary">{{ dataset.properties.recordsize.value }}</dd>
+                    </div>
+                    {% endif %}
+                    {% if 'atime' in dataset.properties %}
+                    <div class="flex justify-between items-center">
+                        <dt class="text-text-secondary">ATime:</dt>
+                        <dd class="text-text-primary">{{ dataset.properties.atime.value }}</dd>
+                    </div>
+                    {% endif %}
+                    {% if 'sync' in dataset.properties %}
+                    <div class="flex justify-between items-center">
+                        <dt class="text-text-secondary">Sync:</dt>
+                        <dd class="text-text-primary">{{ dataset.properties.sync.value }}</dd>
+                    </div>
+                    {% endif %}
+                </dl>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-body">
+                <h2 class="text-xl font-semibold text-text-primary mb-4 pb-3 border-b border-border-subtle">Data Protection</h2>
+                <dl class="space-y-3">
+                    {% if 'checksum' in dataset.properties %}
+                    <div class="flex justify-between items-center">
+                        <dt class="text-text-secondary">Checksum:</dt>
+                        <dd class="text-text-primary">{{ dataset.properties.checksum.value }}</dd>
+                    </div>
+                    {% endif %}
+                    {% if 'copies' in dataset.properties %}
+                    <div class="flex justify-between items-center">
+                        <dt class="text-text-secondary">Copies:</dt>
+                        <dd class="text-text-primary">{{ dataset.properties.copies.value }}</dd>
+                    </div>
+                    {% endif %}
+                    {% if 'dedup' in dataset.properties %}
+                    <div class="flex justify-between items-center">
+                        <dt class="text-text-secondary">Deduplication:</dt>
+                        <dd class="text-text-primary">{{ dataset.properties.dedup.value }}</dd>
+                    </div>
+                    {% endif %}
+                    {% if 'readonly' in dataset.properties %}
+                    <div class="flex justify-between items-center">
+                        <dt class="text-text-secondary">Read-Only:</dt>
+                        <dd>
+                            {% if dataset.properties.readonly.value == 'on' %}
+                            <span class="inline-flex items-center gap-1 text-warning-400">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+                                </svg>
+                                Yes
+                            </span>
+                            {% else %}
+                            <span class="inline-flex items-center gap-1 text-success-400">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z"></path>
+                                </svg>
+                                No
+                            </span>
+                            {% endif %}
+                        </dd>
+                    </div>
+                    {% endif %}
+                </dl>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quotas & Reservations -->
+    {% if 'quota' in dataset.properties or 'reservation' in dataset.properties or 'refquota' in dataset.properties or 'refreservation' in dataset.properties %}
+    <div class="card">
+        <div class="card-body">
+            <h2 class="text-xl font-semibold text-text-primary mb-4 pb-3 border-b border-border-subtle">Quotas & Reservations</h2>
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {% if 'quota' in dataset.properties %}
+                <div class="flex justify-between items-center">
+                    <dt class="text-text-secondary">Quota:</dt>
+                    <dd class="text-text-primary">{{ dataset.properties.quota.value }}</dd>
+                </div>
+                {% endif %}
+                {% if 'reservation' in dataset.properties %}
+                <div class="flex justify-between items-center">
+                    <dt class="text-text-secondary">Reservation:</dt>
+                    <dd class="text-text-primary">{{ dataset.properties.reservation.value }}</dd>
+                </div>
+                {% endif %}
+                {% if 'refquota' in dataset.properties %}
+                <div class="flex justify-between items-center">
+                    <dt class="text-text-secondary">Ref Quota:</dt>
+                    <dd class="text-text-primary">{{ dataset.properties.refquota.value }}</dd>
+                </div>
+                {% endif %}
+                {% if 'refreservation' in dataset.properties %}
+                <div class="flex justify-between items-center">
+                    <dt class="text-text-secondary">Ref Reservation:</dt>
+                    <dd class="text-text-primary">{{ dataset.properties.refreservation.value }}</dd>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Action Buttons -->
+    <div class="card">
+        <div class="card-body">
+            <h2 class="text-xl font-semibold text-text-primary mb-4 pb-3 border-b border-border-subtle">Actions</h2>
+            <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                <a href="/zfs/datasets/create/form?parent={{ dataset.name }}" class="btn-primary rounded-lg inline-flex items-center justify-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                    </svg>
+                    Create Child
+                </a>
+                {% if dataset.properties.type.value == 'filesystem' and dataset.properties.mountpoint.value not in ['-', 'none'] %}
+                <form method="post" action="/zfs/datasets/{{ dataset.name }}/mount" class="w-full">
+                    <button type="submit" style="background-color: #9333ea !important;" class="hover:bg-purple-700 text-white font-medium py-2 px-4 rounded-lg transition-colors w-full inline-flex items-center justify-center gap-2 border-0">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 19a2 2 0 01-2-2V7a2 2 0 012-2h4l2 2h4a2 2 0 012 2v1M5 19h14a2 2 0 002-2v-5a2 2 0 00-2-2H9a2 2 0 00-2 2v5a2 2 0 01-2 2z"></path>
+                        </svg>
+                        Mount
+                    </button>
+                </form>
+                <form method="post" action="/zfs/datasets/{{ dataset.name }}/unmount" id="form-unmount" class="w-full">
+                    <button type="button" style="background-color: #ca8a04 !important;" class="hover:bg-yellow-700 text-white font-medium py-2 px-4 rounded-lg transition-colors w-full inline-flex items-center justify-center gap-2 border-0"
+                            onclick="showConfirm('confirm-unmount')">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 13h6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                        </svg>
+                        Unmount
+                    </button>
+                </form>
+                {% endif %}
+                <a href="/zfs/datasets/{{ dataset.name }}/properties" class="btn-success rounded-lg inline-flex items-center justify-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                    </svg>
+                    Properties
+                </a>
+                <a href="/zfs/datasets/{{ dataset.name }}/rename/form" class="bg-orange-600 hover:bg-orange-700 text-white font-medium py-2 px-4 rounded-lg transition-colors inline-flex items-center justify-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                    </svg>
+                    Rename
+                </a>
+                <form method="post" action="/zfs/datasets/{{ dataset.name }}/promote" id="form-promote" class="w-full">
+                    <button type="button" class="btn-secondary w-full inline-flex items-center justify-center gap-2"
+                            onclick="showConfirm('confirm-promote')">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 11l5-5m0 0l5 5m-5-5v12"></path>
+                        </svg>
+                        Promote
+                    </button>
+                </form>
+                {% if 'encryption' in dataset.properties and dataset.properties.encryption.value not in ['off', '-'] %}
+                <form method="post" action="/zfs/datasets/{{ dataset.name }}/load-key">
+                    <button type="submit" class="btn-info w-full inline-flex items-center justify-center gap-2"
+                            title="Load encryption key">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z"></path>
+                        </svg>
+                        Load Key
+                    </button>
+                </form>
+                <form method="post" action="/zfs/datasets/{{ dataset.name }}/unload-key" id="form-unload-key" class="w-full">
+                    <button type="button" class="btn-secondary w-full inline-flex items-center justify-center gap-2"
+                            onclick="showConfirm('confirm-unload-key')"
+                            title="Unload encryption key">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+                        </svg>
+                        Unload Key
+                    </button>
+                </form>
+                <form method="post" action="/zfs/datasets/{{ dataset.name }}/change-key" id="form-change-key" class="w-full">
+                    <button type="button" class="btn-warning w-full inline-flex items-center justify-center gap-2"
+                            onclick="showConfirm('confirm-change-key')"
+                            title="Change encryption key">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"></path>
+                        </svg>
+                        Change Key
+                    </button>
+                </form>
+                <form method="post" action="/zfs/datasets/{{ dataset.name }}/change-key/inherit" id="form-inherit-key" class="w-full">
+                    <button type="button" class="btn-info w-full inline-flex items-center justify-center gap-2"
+                            onclick="showConfirm('confirm-inherit-key')"
+                            title="Inherit encryption key from parent">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
+                        </svg>
+                        Inherit Key
+                    </button>
+                </form>
+                {% endif %}
+            </div>
+            <div class="card-nested mt-4">
+                <p class="text-xs text-text-tertiary flex items-start gap-2">
+                    <svg class="w-4 h-4 text-info-400 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    <span>
+                        <strong>Note:</strong> Promote action is only applicable for cloned datasets. Mount/unmount actions are only available for filesystems. Dataset destruction must be performed manually via command line for safety.
+                        {% if 'encryption' in dataset.properties and dataset.properties.encryption.value not in ['off', '-'] %}
+                        Encryption key management is available for encrypted datasets.
+                        {% endif %}
+                    </span>
+                </p>
+            </div>
+        </div>
+    </div>
+
+    {% endif %}
+
+    <!-- Back Button -->
+    <div>
+        <a href="/zfs/datasets" class="text-primary-400 hover:text-primary-300 inline-flex items-center gap-2 transition-colors">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+            </svg>
+            Back to Datasets
+        </a>
+    </div>
+</div>
+
+{% if dataset %}
+<!-- Confirmation Modals -->
+{% set id = 'confirm-unmount' %}
+{% set title = 'Unmount Dataset' %}
+{% set message = 'Unmount dataset ' ~ dataset.name ~ '? This will make the filesystem inaccessible until remounted.' %}
+{% set confirm_text = 'Unmount' %}
+{% set confirm_class = 'warning' %}
+{% set confirm_action = 'document.getElementById("form-unmount").submit()' %}
+{% include 'partials/confirm.jinja' %}
+
+{% set id = 'confirm-promote' %}
+{% set title = 'Promote Dataset' %}
+{% set message = 'Promote ' ~ dataset.name ~ '? This operation swaps the clone and origin, making this dataset independent. Only valid for cloned datasets.' %}
+{% set confirm_text = 'Promote' %}
+{% set confirm_class = 'warning' %}
+{% set confirm_action = 'document.getElementById("form-promote").submit()' %}
+{% include 'partials/confirm.jinja' %}
+
+{% if 'encryption' in dataset.properties and dataset.properties.encryption.value not in ['off', '-'] %}
+{% set id = 'confirm-unload-key' %}
+{% set title = 'Unload Encryption Key' %}
+{% set message = 'Unload encryption key for ' ~ dataset.name ~ '? The dataset will remain encrypted but unmountable until the key is loaded again.' %}
+{% set confirm_text = 'Unload Key' %}
+{% set confirm_class = 'warning' %}
+{% set confirm_action = 'document.getElementById("form-unload-key").submit()' %}
+{% include 'partials/confirm.jinja' %}
+
+{% set id = 'confirm-change-key' %}
+{% set title = 'Change Encryption Key' %}
+{% set message = 'Change encryption key for ' ~ dataset.name ~ '? You will be prompted for the new key. Make sure to backup the key securely.' %}
+{% set confirm_text = 'Change Key' %}
+{% set confirm_class = 'warning' %}
+{% set confirm_action = 'document.getElementById("form-change-key").submit()' %}
+{% include 'partials/confirm.jinja' %}
+
+{% set id = 'confirm-inherit-key' %}
+{% set title = 'Inherit Encryption Key' %}
+{% set message = 'Make ' ~ dataset.name ~ ' inherit encryption key from parent? This will change the encryption key source to the parent dataset.' %}
+{% set confirm_text = 'Inherit Key' %}
+{% set confirm_class = 'primary' %}
+{% set confirm_action = 'document.getElementById("form-inherit-key").submit()' %}
+{% include 'partials/confirm.jinja' %}
+{% endif %}
+
+<script>
+// Ensure showConfirm function is available
+window.showConfirm = function(dialogId) {
+    const dialog = document.getElementById(dialogId);
+    
+    if (!dialog) {
+        console.error('Dialog not found:', dialogId);
+        return;
+    }
+    
+    // Try using Alpine's global Alpine object if available
+    if (window.Alpine) {
+        // Use Alpine.$data to access the component's data
+        const component = window.Alpine.$data(dialog);
+        if (component) {
+            component.open = true;
+            return;
+        }
+    }
+    
+    // Fallback to __x property
+    if (dialog.__x) {
+        dialog.__x.$data.open = true;
+        return;
+    }
+    
+    // If neither works, try dispatching an event
+    dialog.dispatchEvent(new CustomEvent('open-modal'));
+    console.warn('Could not open modal using Alpine.js, tried dispatching event');
+};
+</script>
+{% endif %}
+
+{% endblock %}

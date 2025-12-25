@@ -1,0 +1,410 @@
+{% extends "layout_main.jinja" %}
+
+{% block content %}
+<div class="container-page max-w-4xl">
+    <!-- Breadcrumb -->
+    <nav class="text-sm mb-6" aria-label="Breadcrumb">
+        <ol class="flex items-center space-x-2">
+            <li><a href="/" class="text-primary-400 hover:text-primary-300 transition-colors">Home</a></li>
+            <li class="text-text-tertiary">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                </svg>
+            </li>
+            <li><a href="/zfs/replication" class="text-primary-400 hover:text-primary-300 transition-colors">Replication</a></li>
+            <li class="text-text-tertiary">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                </svg>
+            </li>
+            <li class="text-text-primary font-medium">ZFS Send/Receive</li>
+        </ol>
+    </nav>
+
+    <!-- Page Header -->
+    <div class="mb-8">
+        <h1 class="text-3xl font-bold text-text-primary mb-2">ZFS Send/Receive</h1>
+        <p class="text-text-secondary">Replicate ZFS snapshots locally or to remote systems</p>
+    </div>
+
+    <!-- Messages -->
+    {% if error %}
+        <div id="error-message" class="bg-danger-900/30 border border-danger-700 text-danger-400 px-4 py-3 rounded-lg mb-6 flex items-center">
+            <svg class="w-5 h-5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+            <span><strong>Error:</strong> {{ error }}</span>
+        </div>
+    {% endif %}
+
+    <!-- Replication Form -->
+    <div class="card mb-6">
+        <div class="card-body">
+            <form method="post" action="/zfs/replication/send-receive/execute" id="replication-form">
+                <!-- Source Snapshot -->
+                <div class="mb-6">
+                    <label class="form-label" for="source">
+                        Source Snapshot <span class="text-danger-400">*</span>
+                    </label>
+                    <select name="source" id="source" required class="form-select">
+                        <option value="">-- Select a snapshot --</option>
+                        {% for snapshot in snapshots %}
+                        <option value="{{ snapshot.name }}">{{ snapshot.name }}</option>
+                        {% endfor %}
+                    </select>
+                    <p class="text-text-tertiary text-xs mt-1">Select the source snapshot to replicate</p>
+                </div>
+
+                <!-- Replication Type -->
+                <div class="mb-6">
+                    <label class="form-label" for="replication_type">
+                        Replication Type <span class="text-danger-400">*</span>
+                    </label>
+                    <select name="replication_type" id="replication_type" required class="form-select">
+                        <option value="local">Local (same system)</option>
+                        <option value="push">Push (local → remote)</option>
+                    </select>
+                </div>
+
+                <!-- Remote Options (shown when push is selected) -->
+                <div id="remote-options" class="hidden mb-6">
+                    <div class="card-nested mb-6">
+                        <h3 class="font-semibold text-lg mb-4 text-text-primary flex items-center">
+                            <svg class="w-5 h-5 mr-2 text-info-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/>
+                            </svg>
+                            Remote Connection
+                        </h3>
+                        
+                        <!-- SSH Connection Dropdown -->
+                        <div class="mb-4">
+                            <label class="form-label" for="ssh_connection">
+                                SSH Connection <span class="text-danger-400">*</span>
+                            </label>
+                            {% if ssh_connections and ssh_connections|length > 0 %}
+                            <select name="ssh_connection_id" id="ssh_connection" class="form-select">
+                                <option value="">-- Select SSH Connection --</option>
+                                {% for conn in ssh_connections %}
+                                <option value="{{ conn.id }}" 
+                                        data-host="{{ conn.host }}" 
+                                        data-username="{{ conn.username }}" 
+                                        data-port="{{ conn.port }}">
+                                    {{ conn.name }} ({{ conn.username }}@{{ conn.host }}{% if conn.port != 22 %}:{{ conn.port }}{% endif %})
+                                </option>
+                                {% endfor %}
+                            </select>
+                            <p class="text-text-tertiary text-xs mt-1">Select a configured SSH connection</p>
+                            {% else %}
+                            <div class="bg-warning-900/30 border border-warning-700 text-warning-400 px-4 py-3 rounded-lg">
+                                <div class="flex items-start">
+                                    <svg class="w-5 h-5 mr-2 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                                    </svg>
+                                    <div>
+                                        <p class="font-medium">No SSH connections configured</p>
+                                        <p class="text-sm mt-1">You need to configure SSH connections before using remote replication.</p>
+                                        <a href="/utils/ssh/add" class="btn-warning btn-sm mt-2 inline-flex items-center gap-2">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+                                            </svg>
+                                            Add SSH Connection
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endif %}
+                        </div>
+
+                        <!-- Hidden fields to store connection details for form submission -->
+                        <input type="hidden" name="remote_host" id="remote_host" value="">
+                        <input type="hidden" name="remote_port" id="remote_port" value="22">
+                        
+                        <!-- Connection Info Display -->
+                        <div id="connection-info" class="hidden mb-4 bg-bg-elevated-2 p-3 rounded-lg border border-border-subtle">
+                            <div class="text-sm">
+                                <span class="text-text-tertiary">Selected:</span>
+                                <span id="connection-display" class="text-text-primary font-mono ml-2"></span>
+                            </div>
+                        </div>
+                        
+                        <div class="flex items-center gap-4">
+                            <button type="button" id="test-connection-btn" class="btn-success" disabled>
+                                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                                </svg>
+                                Test Connection & Load Datasets
+                            </button>
+                            <span id="connection-status"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Target Dataset -->
+                <div class="mb-6">
+                    <label class="form-label" for="target">
+                        Target Dataset <span class="text-danger-400">*</span>
+                    </label>
+                    <select name="target" id="target" required class="form-select">
+                        <option value="">-- Select target dataset --</option>
+                    </select>
+                    <p class="text-text-tertiary text-xs mt-1">Select the target dataset for replication</p>
+                </div>
+
+                <!-- Compression -->
+                <div class="mb-6">
+                    <label class="form-label" for="compression">
+                        Compression
+                    </label>
+                    <select name="compression" id="compression" class="form-select">
+                        {% for method in compression_methods %}
+                        <option value="{{ method }}" {% if method == 'lz4' %}selected{% endif %}>{{ method }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Options -->
+                <div class="space-y-3 mb-6">
+                    <label class="flex items-center">
+                        <input type="checkbox" name="incremental" value="true" checked class="form-checkbox">
+                        <span class="ml-3 text-text-secondary">Incremental (use most recent common snapshot)</span>
+                    </label>
+
+                    <label class="flex items-center">
+                        <input type="checkbox" name="recursive" value="true" class="form-checkbox">
+                        <span class="ml-3 text-text-secondary">Recursive (include child datasets)</span>
+                    </label>
+                </div>
+
+                <!-- Actions -->
+                <div class="flex items-center justify-between pt-4 border-t border-border-subtle">
+                    <button type="submit" class="btn-primary inline-flex items-center gap-2 htmx-loading">
+                        <span class="htmx-indicator">
+                            <div class="loading-spinner loading-spinner-sm"></div>
+                        </span>
+                        <span>
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/>
+                            </svg>
+                        </span>
+                        <span>Execute Replication</span>
+                    </button>
+                    <a href="/zfs/replication" class="btn-secondary">
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                        Cancel
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- General Notes -->
+    <div class="card-nested bg-info-900/20 border-info-700 mb-6">
+        <h3 class="font-semibold mb-3 text-text-primary flex items-center">
+            <svg class="w-5 h-5 mr-2 text-info-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+            Notes
+        </h3>
+        <ul class="space-y-2 text-sm text-text-secondary">
+            <li class="flex items-start">
+                <svg class="w-4 h-4 mr-2 mt-0.5 text-info-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                </svg>
+                <span><strong>SSH Connections:</strong> Remote replication uses key-based SSH authentication configured in <a href="/utils/ssh" class="text-primary-400 hover:text-primary-300">SSH Connections</a></span>
+            </li>
+            <li class="flex items-start">
+                <svg class="w-4 h-4 mr-2 mt-0.5 text-info-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                </svg>
+                <span>The target dataset will be created if it doesn't exist</span>
+            </li>
+            <li class="flex items-start">
+                <svg class="w-4 h-4 mr-2 mt-0.5 text-info-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                </svg>
+                <span>Incremental sends are more efficient and require less bandwidth</span>
+            </li>
+            <li class="flex items-start">
+                <svg class="w-4 h-4 mr-2 mt-0.5 text-info-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                </svg>
+                <span>Use recursive option to replicate entire dataset hierarchies</span>
+            </li>
+        </ul>
+    </div>
+
+    <!-- SSH Connection Info -->
+    <div class="card-nested bg-success-900/20 border-success-700">
+        <h3 class="font-semibold mb-3 text-text-primary flex items-center">
+            <svg class="w-5 h-5 mr-2 text-success-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/>
+            </svg>
+            SSH Key-Based Authentication
+        </h3>
+        <div class="text-sm text-text-secondary">
+            <p class="mb-3">Remote replication uses secure SSH key-based authentication. Connections are managed centrally in the SSH Connection Manager.</p>
+            <div class="flex items-center gap-3">
+                <a href="/utils/ssh" class="btn-success btn-sm inline-flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                    </svg>
+                    Manage SSH Connections
+                </a>
+                <a href="/utils/ssh/add" class="btn-primary btn-sm inline-flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+                    </svg>
+                    Add New Connection
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+    const localDatasets = {{ datasets | tojson }};
+    const sourceSelect = document.getElementById('source');
+    const replicationTypeSelect = document.getElementById('replication_type');
+    const remoteOptions = document.getElementById('remote-options');
+    const targetSelect = document.getElementById('target');
+    const sshConnectionSelect = document.getElementById('ssh_connection');
+    const testConnectionBtn = document.getElementById('test-connection-btn');
+    const connectionStatus = document.getElementById('connection-status');
+    const connectionInfo = document.getElementById('connection-info');
+    const connectionDisplay = document.getElementById('connection-display');
+    const remoteHostInput = document.getElementById('remote_host');
+    const remotePortInput = document.getElementById('remote_port');
+
+// Handle replication type change
+replicationTypeSelect.addEventListener('change', function() {
+    if (this.value === 'push') {
+        remoteOptions.classList.remove('hidden');
+        targetSelect.innerHTML = '<option value="">-- Select SSH connection first --</option>';
+    } else {
+        remoteOptions.classList.add('hidden');
+        loadLocalDatasets();
+    }
+});
+
+// Handle SSH connection selection
+if (sshConnectionSelect) {
+    sshConnectionSelect.addEventListener('change', function() {
+        const selectedOption = this.options[this.selectedIndex];
+        
+        if (this.value) {
+            // Show connection info
+            const host = selectedOption.dataset.host;
+            const username = selectedOption.dataset.username;
+            const port = selectedOption.dataset.port;
+            
+            connectionDisplay.textContent = `${username}@${host}:${port}`;
+            connectionInfo.classList.remove('hidden');
+            testConnectionBtn.disabled = false;
+            
+            // Set hidden form values
+            remoteHostInput.value = `${username}@${host}`;
+            remotePortInput.value = port;
+            
+            // Clear previous datasets and status
+            targetSelect.innerHTML = '<option value="">-- Test connection to load datasets --</option>';
+            connectionStatus.innerHTML = '';
+        } else {
+            connectionInfo.classList.add('hidden');
+            testConnectionBtn.disabled = true;
+            remoteHostInput.value = '';
+            remotePortInput.value = '22';
+            targetSelect.innerHTML = '<option value="">-- Select SSH connection first --</option>';
+            connectionStatus.innerHTML = '';
+        }
+    });
+}
+
+// Handle source snapshot change (for local replication)
+sourceSelect.addEventListener('change', function() {
+    if (replicationTypeSelect.value === 'local') {
+        loadLocalDatasets();
+    }
+});
+
+// Load local datasets (excluding source dataset)
+function loadLocalDatasets() {
+    const sourceSnapshot = sourceSelect.value;
+    if (!sourceSnapshot) {
+        targetSelect.innerHTML = '<option value="">-- Select source snapshot first --</option>';
+        return;
+    }
+    
+    // Extract dataset name from snapshot (before @)
+    const sourceDataset = sourceSnapshot.split('@')[0];
+    
+    // Clear and populate target dropdown
+    targetSelect.innerHTML = '<option value="">-- Select target dataset --</option>';
+    localDatasets.forEach(dataset => {
+        if (dataset.name !== sourceDataset) {
+            const option = document.createElement('option');
+            option.value = dataset.name;
+            option.textContent = dataset.name;
+            targetSelect.appendChild(option);
+        }
+    });
+}
+
+// Test remote connection and load datasets
+testConnectionBtn.addEventListener('click', async function() {
+    const sshConnectionId = sshConnectionSelect ? sshConnectionSelect.value : '';
+    
+    if (!sshConnectionId) {
+        connectionStatus.innerHTML = '<span class="text-danger-400 flex items-center"><svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg> Please select an SSH connection</span>';
+        return;
+    }
+    
+    connectionStatus.innerHTML = '<span class="text-info-400 flex items-center"><svg class="w-4 h-4 mr-1 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg> Testing connection...</span>';
+    testConnectionBtn.disabled = true;
+    
+    try {
+        const response = await fetch('/zfs/replication/api/test-remote-connection', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                ssh_connection_id: sshConnectionId
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            connectionStatus.innerHTML = '<span class="text-success-400 flex items-center"><svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg> ' + data.message + '</span>';
+            
+            // Populate target dropdown with remote datasets
+            targetSelect.innerHTML = '<option value="">-- Select target dataset --</option>';
+            data.datasets.forEach(dataset => {
+                const option = document.createElement('option');
+                option.value = dataset;
+                option.textContent = dataset;
+                targetSelect.appendChild(option);
+            });
+        } else {
+            connectionStatus.innerHTML = `<span class="text-danger-400 flex items-center"><svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg> ${data.error}</span>`;
+            targetSelect.innerHTML = '<option value="">-- Connection failed --</option>';
+        }
+    } catch (error) {
+        connectionStatus.innerHTML = '<span class="text-danger-400 flex items-center"><svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg> Connection failed</span>';
+        targetSelect.innerHTML = '<option value="">-- Connection failed --</option>';
+    } finally {
+        testConnectionBtn.disabled = false;
+    }
+});
+
+// Initialize on page load
+if (replicationTypeSelect.value === 'local') {
+    loadLocalDatasets();
+}
+})();
+</script>
+{% endblock %}

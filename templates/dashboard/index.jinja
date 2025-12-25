@@ -1,0 +1,232 @@
+{% extends "layout.jinja" %}
+
+{% set active_page = 'dashboard' %}
+
+{% block content %}
+    <style>
+        @keyframes pulse-border-danger {
+            0%, 100% {
+                border-color: rgb(239 68 68);
+                box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7),
+                            0 0 0 3px rgba(239, 68, 68, 0.4),
+                            0 0 0 6px rgba(239, 68, 68, 0.1);
+            }
+            50% {
+                border-color: rgba(239, 68, 68, 0.5);
+                box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.3),
+                            0 0 0 3px rgba(239, 68, 68, 0.2),
+                            0 0 0 6px rgba(239, 68, 68, 0.05);
+            }
+        }
+        @keyframes pulse-border-warning {
+            0%, 100% {
+                border-color: rgb(234 179 8);
+                box-shadow: 0 0 0 0 rgba(234, 179, 8, 0.7),
+                            0 0 0 3px rgba(234, 179, 8, 0.4),
+                            0 0 0 6px rgba(234, 179, 8, 0.1);
+            }
+            50% {
+                border-color: rgba(234, 179, 8, 0.5);
+                box-shadow: 0 0 0 0 rgba(234, 179, 8, 0.3),
+                            0 0 0 3px rgba(234, 179, 8, 0.2),
+                            0 0 0 6px rgba(234, 179, 8, 0.05);
+            }
+        }
+        .pulse-border-danger {
+            animation: pulse-border-danger 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+            border: 4px solid rgb(239 68 68);
+        }
+        .pulse-border-warning {
+            animation: pulse-border-warning 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+            border: 4px solid rgb(234 179 8);
+        }
+    </style>
+    <div class="space-y-6">
+        <!-- Page Header -->
+        <div class="flex items-center justify-between">
+            <div>
+                <h1 class="text-3xl font-bold text-text-primary">System Dashboard</h1>
+                <p class="text-text-secondary mt-1">Overview of system resources and ZFS pools</p>
+            </div>
+        </div>
+
+        <!-- Dashboard Content -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            
+            <!-- Left Column: System Information -->
+            <div class="space-y-6">
+                <!-- System Info Card -->
+                <div class="card animate-fade-in">
+                    <div class="card-body">
+                        <div class="flex items-center gap-3 mb-4">
+                            <div class="p-2 bg-primary-500/10 border border-primary-500/20 rounded-lg">
+                                <svg class="w-6 h-6 text-primary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+                                </svg>
+                            </div>
+                            <h2 class="text-xl font-semibold text-text-primary">System Information</h2>
+                        </div>
+                        {% if platform %}
+                            {% with data=platform %}
+                                {% include "dashboard/table.jinja" %}
+                            {% endwith %}
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Memory Info Card -->
+                <div class="card animate-fade-in" style="animation-delay: 0.1s;">
+                    <div class="card-body">
+                        <div class="flex items-center gap-3 mb-4">
+                            <div class="p-2 bg-success-500/10 border border-success-500/20 rounded-lg">
+                                <svg class="w-6 h-6 text-success-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"></path>
+                                </svg>
+                            </div>
+                            <h2 class="text-xl font-semibold text-text-primary">Memory Information</h2>
+                        </div>
+                        {% if memory %}
+                            {% with data=memory %}
+                                {% include "dashboard/table.jinja" %}
+                            {% endwith %}
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- System Load Card -->
+                <div class="card animate-fade-in" 
+                     style="animation-delay: 0.2s;">
+                    <div class="card-body">
+                        <div class="flex items-center gap-3 mb-4">
+                            <div class="p-2 bg-info-500/10 border border-info-500/20 rounded-lg">
+                                <svg class="w-6 h-6 text-info-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                                </svg>
+                            </div>
+                            <h2 class="text-xl font-semibold text-text-primary">System Load</h2>
+                            <svg class="w-4 h-4 text-text-tertiary htmx-indicator ml-auto animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                        </div>
+                        {% if system_load %}
+                            <div class="overflow-x-auto">
+                                <table class="min-w-full">
+                                    <tbody id="system-load-values"
+                                           hx-get="/system-load-values"
+                                           hx-trigger="every 1s"
+                                           hx-swap="innerHTML">
+                                        {% for key, value in system_load.items() %}
+                                        <tr>
+                                            <td class="px-4 py-2 text-sm text-text-secondary">{{ key }}</td>
+                                            <td class="px-4 py-2 text-sm font-medium text-text-primary">{{ value }}</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Column: ZFS Pools -->
+            <div class="space-y-6">
+                <div class="card animate-fade-in" style="animation-delay: 0.3s;">
+                    <div class="card-body">
+                        <div class="flex items-center gap-3 mb-4">
+                            <div class="p-2 bg-purple-500/10 border border-purple-500/20 rounded-lg">
+                                <svg class="w-6 h-6 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"></path>
+                                </svg>
+                            </div>
+                            <h2 class="text-xl font-semibold text-text-primary">ZFS Pools</h2>
+                        </div>
+                        {% if pools %}
+                            <div class="space-y-2">
+                                {% for pool in pools %}
+                                    {% if 'Error' in pool %}
+                                        <div class="card-nested">
+                                            <div class="px-4 py-3 text-warning-400">
+                                                <div class="flex items-center gap-2">
+                                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                                                    </svg>
+                                                    <span>{{ pool['Error'] }}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    {% else %}
+                                    <a href="/zfs/pools/{{ pool['Pool Name'] }}" class="card-nested block hover:bg-bg-elevated-3 transition-colors group overflow-hidden {% if pool['Health'] == 'SUSPENDED' or pool['Health'] == 'FAULTED' or pool['Health'] == 'UNAVAIL' %}pulse-border-danger{% elif pool['Health'] == 'DEGRADED' %}pulse-border-warning{% endif %}">
+                                        <table class="min-w-full text-sm">
+                                            <thead>
+                                                <tr class="text-xs font-medium text-text-secondary uppercase">
+                                                    <th class="px-3 py-2 text-left w-32"></th>
+                                                    <th class="px-3 py-2 text-center">Size</th>
+                                                    <th class="px-3 py-2 text-center">Allocated</th>
+                                                    <th class="px-3 py-2 text-center">Free</th>
+                                                    <th class="px-3 py-2 text-center">Capacity</th>
+                                                    <th class="px-3 py-2 text-center">Health</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <tr>
+                                                    <td class="px-3 py-2 font-semibold text-primary-400 group-hover:text-primary-300 transition-colors">
+                                                        {{ pool['Pool Name'] }}
+                                                    </td>
+                                                    <td class="px-3 py-2 text-center text-text-primary">{{ pool['Size'] }}</td>
+                                                    <td class="px-3 py-2 text-center text-text-primary">{{ pool['Allocated'] }}</td>
+                                                    <td class="px-3 py-2 text-center text-text-primary">{{ pool['Free'] }}</td>
+                                                    <td class="px-3 py-2 text-center">
+                                                        <div class="flex items-center justify-center gap-2">
+                                                            <span class="text-text-primary">{{ pool['Capacity'] }}</span>
+                                                            {% set cap_val = pool['Capacity'].rstrip('%') | int %}
+                                                            <div class="w-16 bg-bg-elevated-3 rounded-full h-2">
+                                                                <div class="{% if cap_val > 90 %}bg-danger-500{% elif cap_val >= 80 %}bg-warning-500{% else %}bg-success-500{% endif %} h-2 rounded-full transition-all" style="width: {{ pool['Capacity'] }}"></div>
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                    <td class="px-3 py-2 text-center">
+                                                        {% if pool['Health'] == 'ONLINE' %}
+                                                            <span class="badge-success text-xs">{{ pool['Health'] }}</span>
+                                                        {% elif pool['Health'] == 'DEGRADED' %}
+                                                            <span class="badge-warning text-xs">{{ pool['Health'] }}</span>
+                                                        {% else %}
+                                                            <span class="badge-danger text-xs">{{ pool['Health'] }}</span>
+                                                        {% endif %}
+                                                    </td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </a>
+                                    {% endif %}
+                                {% endfor %}
+                            </div>
+                        {% else %}
+                            <div class="text-center py-8">
+                                <svg class="w-12 h-12 text-text-tertiary mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"></path>
+                                </svg>
+                                <p class="text-text-secondary mb-4">No ZFS pools found</p>
+                                <div class="flex items-center justify-center gap-3">
+                                    <a href="/zfs/pools/import" class="btn-info inline-flex items-center gap-2">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path>
+                                        </svg>
+                                        Import Pool
+                                    </a>
+                                    <a href="/zfs/pools/create" class="btn-success inline-flex items-center gap-2">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                                        </svg>
+                                        Create Pool
+                                    </a>
+                                </div>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}
