@@ -44,6 +44,35 @@ The installation scripts will:
 8. Create `.env` configuration file
 9. Configure sudo permissions (Linux Only)
 
+### Local Development Setup
+
+If you want to develop directly from your git clone without installing to `/opt/webzfs`:
+
+```bash
+# Clone the repository
+git clone https://github.com/webzfs/webzfs.git
+cd webzfs
+
+# Run the automated setup script
+chmod +x setup_dev.sh
+./setup_dev.sh
+```
+
+The `setup_dev.sh` script will:
+- Check for required dependencies (Python 3.11+, Node.js v20+, npm, make, libsodium)
+- Create a Python virtual environment (`.venv`) in your current directory
+- Install all Python dependencies
+- Install Node.js dependencies
+- Build static CSS assets
+- Create a `.env` configuration file with a secure SECRET_KEY
+
+After setup, you can:
+- Run the development server with `./run_dev.sh`
+- Make changes and commit/push directly from this directory
+- Rebuild CSS with `npm run build:css` or `npm run watch:css`
+
+**Note:** You'll need sudo/root permissions when running the application to access ZFS commands. On Linux, you may need to configure sudo permissions manually - see the installation scripts for the required sudoers configuration.
+
 ### Manual Installation
 
 If you prefer to install manually or to a custom location:
