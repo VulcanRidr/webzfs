@@ -110,16 +110,18 @@
                             </svg>
                         </div>
                         {% if system_load %}
-                            <div class="overflow-x-auto">
+                            <div class="overflow-x-auto"
+                                 hx-get="/system-load-values"
+                                 hx-trigger="every 1s"
+                                 hx-swap="none">
                                 <table class="min-w-full">
-                                    <tbody id="system-load-values"
-                                           hx-get="/system-load-values"
-                                           hx-trigger="every 1s"
-                                           hx-swap="innerHTML">
+                                    <tbody>
                                         {% for key, value in system_load.items() %}
                                         <tr>
                                             <td class="px-4 py-2 text-sm text-text-secondary">{{ key }}</td>
-                                            <td class="px-4 py-2 text-sm font-medium text-text-primary">{{ value }}</td>
+                                            <td class="px-4 py-2 text-sm font-medium text-text-primary">
+                                                <span id="system-load-{{ loop.index }}">{{ value }}</span>
+                                            </td>
                                         </tr>
                                         {% endfor %}
                                     </tbody>
