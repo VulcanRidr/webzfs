@@ -8,7 +8,7 @@ from typing import List, Dict, Any, Optional
 from datetime import datetime
 from pathlib import Path
 
-from services.utils import is_freebsd
+from services.utils import is_freebsd, run_zfs_command
 from config.settings import Settings
 
 
@@ -47,10 +47,8 @@ class ZFSObservabilityService:
             if pool_name:
                 cmd.append(pool_name)
             
-            result = subprocess.run(
+            result = run_zfs_command(
                 cmd,
-                capture_output=True,
-                text=True,
                 check=True,
                 timeout=timeout
             )
@@ -108,10 +106,8 @@ class ZFSObservabilityService:
             if pool_name:
                 cmd.append(pool_name)
             
-            result = subprocess.run(
+            result = run_zfs_command(
                 cmd,
-                capture_output=True,
-                text=True,
                 check=True,
                 timeout=timeout
             )
@@ -145,10 +141,8 @@ class ZFSObservabilityService:
             if pool_name:
                 cmd.append(pool_name)
             
-            subprocess.run(
+            run_zfs_command(
                 cmd,
-                capture_output=True,
-                text=True,
                 check=True,
                 timeout=timeout
             )
