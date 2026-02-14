@@ -120,6 +120,11 @@ def get_system_load_stats() -> dict[str, Any]:
     return _get_system_load()
 
 
+def get_pool_stats() -> list[dict[str, Any]]:
+    """Public function to get ZFS pool statistics."""
+    return _get_pool_info()
+
+
 def get_dashboard_context() -> dict[str, Any]:
     # Get ZFS version information
     zfs_version = _get_zfs_version()
